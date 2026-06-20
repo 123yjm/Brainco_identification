@@ -169,16 +169,20 @@ void MainWindow::onBrowseData() {
 
 // ---------------------------------------------------------------------------
 void MainWindow::generateConfigFiles(const QString &workDir) {
+  // 全部使用绝对路径，与 identify 内部 resolvePath 兼容
+  QDir wd(workDir);
+  QString absWorkDir = wd.absolutePath();
+
   // 1. 写入 kinematic_params.yaml
   QString kin_yaml = yaml_editor_->toPlainText();
-  QString kin_path = workDir + "/kinematic_params.yaml";
+  QString kin_path = absWorkDir + "/kinematic_params.yaml";
   {
     std::ofstream out(kin_path.toStdString());
     out << kin_yaml.toStdString();
   }
 
   // 2. 写入 identification.yaml
-  QString id_path = workDir + "/identification.yaml";
+  QString id_path = absWorkDir + "/identification.yaml";
   QString data_file = data_file_edit_->text();
   QString robot_name = robot_name_edit_->text();
 
@@ -189,7 +193,7 @@ void MainWindow::generateConfigFiles(const QString &workDir) {
     out << "algorithm: 0\n";
     out << "regularization: 1\n";
     out << "data_file: \"" << data_file.toStdString() << "\"\n";
-    out << "output_file: \"" << (workDir + "/result.yaml").toStdString() << "\"\n";
+    out << "output_file: \"" << (absWorkDir + "/result.yaml").toStdString() << "\"\n";
   }
 }
 
@@ -208,14 +212,15 @@ void MainWindow::onStartIdentification() {
   start_btn_->setEnabled(false);
   status_label_->setText("正在辨识...");
 
-  // 创建工作目录
-  QString workDir = "./res";
+  // 创建 res 目录（绝对路径）
+  QString workDir = QDir::currentPath() + "/res";
   QDir().mkpath(workDir);
 
   generateConfigFiles(workDir);
 
-  // 使用 --algo 命令行参数直接指定算法，数据文件也直接指定
-  QString id_config = workDir + "/identification.yaml";
+  // 使用绝对路径传参
+  QDir wd(workDir);
+  QString id_config = wd.absoluteFilePath("identification.yaml");
   QString data_file = data_file_edit_->text();
   QString algo = algo_combo_->currentText();
 
@@ -236,9 +241,10 @@ void MainWindow::onProcessFinished(int exitCode, QProcess::ExitStatus status) {
 
   if (status == QProcess::NormalExit && exitCode == 0) {
     // 将结果复制到 res/ 目录下
-    QString resultPath = "./res/identification.yaml";
+    QString resDir = QDir::currentPath() + "/res";
+    QString resultPath = resDir + "/identification.yaml";
     QFile::remove(resultPath);
-    QFile::copy("./res/result.yaml", resultPath);
+    QFile::copy(resDir + "/result.yaml", resultPath);
 
     // 提取 RMSE 用于显示
     QString display = "辨识成功！";
