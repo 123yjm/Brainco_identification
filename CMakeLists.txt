@@ -19,3 +19,14 @@ target_link_libraries(brainco_id_core PUBLIC Eigen3::Eigen ${YAML_CPP_LIBRARIES}
 add_executable(identify main.cpp)
 target_compile_definitions(identify PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(identify PRIVATE brainco_id_core)
+
+# ---- Qt 上位机（独立可执行文件，与辨识核心解耦）----
+find_package(Qt5Widgets REQUIRED)
+set(CMAKE_AUTOMOC ON)
+
+add_executable(identify_gui
+  src/qt/main.cpp
+  src/qt/main_window.cpp
+)
+target_include_directories(identify_gui PRIVATE include ${YAML_CPP_INCLUDE_DIR})
+target_link_libraries(identify_gui PRIVATE Qt5::Widgets ${YAML_CPP_LIBRARIES})
