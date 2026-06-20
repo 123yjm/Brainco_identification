@@ -1,0 +1,9 @@
+# 无 ROS 参数辨识配置
+# robot 可选: panda / piper / revoarm_right / revoarm_new
+robot: "revoarm_new"
+# algorithm: 0 表示跑完整基准；1-8 分别对应 OLS/WLS/IRLS/TLS/EKF/ML/CLOE/NLS_FRICTION
+algorithm: 0
+# regularization: 1 开启 Tikhonov 正则化 (默认), 0 关闭
+regularization: 1
+data_file: "data/revoarm_filtered_data_condnum_56.12_0618.csv"
+output_file: "result/identification.yaml"
