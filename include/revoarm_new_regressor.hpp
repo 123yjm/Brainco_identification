@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dynamics_params.hpp"
+#include "body2inertial.hpp"
 
 namespace robot_dynamics {
 

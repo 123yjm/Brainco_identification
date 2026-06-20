@@ -7,7 +7,7 @@ find_package(Eigen3 REQUIRED)
 add_library(brainco_id_core
   src/data_loader.cpp
   src/algorithms.cpp
-  src/dynamics_params.cpp
+  src/body2inertial.cpp
   src/revoarm_new_regressor.cpp
 )
 target_include_directories(brainco_id_core PUBLIC include ${EIGEN3_INCLUDE_DIRS})
