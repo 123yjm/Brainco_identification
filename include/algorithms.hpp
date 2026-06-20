@@ -65,19 +65,6 @@ private:
   int n_params_;
 };
 
-class ML : public IdentificationAlgorithm {
-public:
-  Eigen::VectorXd solve(const Eigen::MatrixXd &W,
-                        const Eigen::VectorXd &Tau_meas) override;
-};
-
-/// CLOE (Closed-Loop Output Error) — 当前为存根，回退到 OLS
-class CLOE : public IdentificationAlgorithm {
-public:
-  Eigen::VectorXd solve(const Eigen::MatrixXd &W,
-                        const Eigen::VectorXd &Tau_meas) override;
-};
-
 class NonlinearFrictionLM : public IdentificationAlgorithm {
 public:
   explicit NonlinearFrictionLM(int dof, int multi_start = 4);

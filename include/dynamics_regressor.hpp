@@ -10,7 +10,7 @@
 namespace robot_dynamics {
 
 /// 动力学回归器抽象基类
-/// 具体机器人（如 RevoarmNewRegressor）继承此类，工厂按 robot 名创建实例
+/// 具体机器人（如 SerialArmRegressor）继承此类，工厂按 robot 名创建实例
 class IDynamicsRegressor {
 public:
   using VectorXd = Eigen::VectorXd;

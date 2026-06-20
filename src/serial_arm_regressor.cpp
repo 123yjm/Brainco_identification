@@ -1,4 +1,4 @@
-#include "revoarm_new_regressor.hpp"
+#include "serial_arm_regressor.hpp"
 #include "robot_config_loader.hpp"
 
 #include <iostream>
@@ -9,11 +9,11 @@ namespace robot_dynamics {
 // 构造函数 — 从 YAML 加载
 // ============================================================================
 
-RevoarmNewRegressor::RevoarmNewRegressor(const std::string &yaml_path) {
+SerialArmRegressor::SerialArmRegressor(const std::string &yaml_path) {
   loadFromYaml(yaml_path);
 }
 
-void RevoarmNewRegressor::loadFromYaml(const std::string &path) {
+void SerialArmRegressor::loadFromYaml(const std::string &path) {
   RobotConfig cfg = loadKinematicConfig(path);
 
   n_dof_ = cfg.dof;
@@ -29,7 +29,7 @@ void RevoarmNewRegressor::loadFromYaml(const std::string &path) {
 
   bodies_ = std::move(cfg.bodies);
 
-  std::cout << "[RevoarmNewRegressor] 从 " << path << " 加载, "
+  std::cout << "[SerialArmRegressor] 从 " << path << " 加载, "
             << n_dof_ << " DOF, " << n_bodies_ << " regressor bodies, "
             << kinematic_prefix_ << " kinematic prefix" << std::endl;
 }
@@ -38,15 +38,15 @@ void RevoarmNewRegressor::loadFromYaml(const std::string &path) {
 // 辅助函数
 // ============================================================================
 
-RevoarmNewRegressor::Matrix3d
-RevoarmNewRegressor::skew(const Vector3d &v) {
+SerialArmRegressor::Matrix3d
+SerialArmRegressor::skew(const Vector3d &v) {
   Matrix3d S;
   S << 0, -v(2), v(1), v(2), 0, -v(0), -v(1), v(0), 0;
   return S;
 }
 
-RevoarmNewRegressor::Matrix4d
-RevoarmNewRegressor::poseToTransform(const Vector3d &pos,
+SerialArmRegressor::Matrix4d
+SerialArmRegressor::poseToTransform(const Vector3d &pos,
                                             const Quaterniond &quat) {
   Matrix4d T = Matrix4d::Identity();
   T.block<3, 3>(0, 0) = quat.toRotationMatrix();
@@ -58,8 +58,8 @@ RevoarmNewRegressor::poseToTransform(const Vector3d &pos,
 // 运动学
 // ============================================================================
 
-std::vector<RevoarmNewRegressor::Matrix4d>
-RevoarmNewRegressor::computeBodyTransforms(const VectorXd &q) const {
+std::vector<SerialArmRegressor::Matrix4d>
+SerialArmRegressor::computeBodyTransforms(const VectorXd &q) const {
   const std::size_t total = kinematic_prefix_ + n_bodies_;
   std::vector<Matrix4d> transforms(total);
 
@@ -87,8 +87,8 @@ RevoarmNewRegressor::computeBodyTransforms(const VectorXd &q) const {
   return transforms;
 }
 
-RevoarmNewRegressor::Vector3d
-RevoarmNewRegressor::computeBodyCOM(std::size_t body_idx,
+SerialArmRegressor::Vector3d
+SerialArmRegressor::computeBodyCOM(std::size_t body_idx,
                                            const VectorXd &q) const {
   auto transforms = computeBodyTransforms(q);
   Vector3d com_local = bodies_[body_idx].com;
@@ -96,8 +96,8 @@ RevoarmNewRegressor::computeBodyCOM(std::size_t body_idx,
   return T.block<3, 3>(0, 0) * com_local + T.block<3, 1>(0, 3);
 }
 
-RevoarmNewRegressor::MatrixXd
-RevoarmNewRegressor::computeBodyOriginJacobian(
+SerialArmRegressor::MatrixXd
+SerialArmRegressor::computeBodyOriginJacobian(
     std::size_t body_idx, const VectorXd &q) const {
   MatrixXd J = MatrixXd::Zero(6, n_dof_);
   auto transforms = computeBodyTransforms(q);
@@ -118,8 +118,8 @@ RevoarmNewRegressor::computeBodyOriginJacobian(
   return J;
 }
 
-RevoarmNewRegressor::MatrixXd
-RevoarmNewRegressor::computeBodyJacobian(std::size_t body_idx,
+SerialArmRegressor::MatrixXd
+SerialArmRegressor::computeBodyJacobian(std::size_t body_idx,
                                                 const VectorXd &q) const {
   MatrixXd J = MatrixXd::Zero(6, n_dof_);
   auto transforms = computeBodyTransforms(q);
@@ -140,8 +140,8 @@ RevoarmNewRegressor::computeBodyJacobian(std::size_t body_idx,
   return J;
 }
 
-RevoarmNewRegressor::MatrixXd
-RevoarmNewRegressor::computeBodyOriginJacobianDerivative(
+SerialArmRegressor::MatrixXd
+SerialArmRegressor::computeBodyOriginJacobianDerivative(
     std::size_t body_idx, const VectorXd &q, const VectorXd &qd) const {
   const double eps = 1e-7;
   VectorXd q_plus = q + eps * qd;
@@ -151,8 +151,8 @@ RevoarmNewRegressor::computeBodyOriginJacobianDerivative(
   return (J_plus - J_minus) / (2.0 * eps);
 }
 
-RevoarmNewRegressor::MatrixXd
-RevoarmNewRegressor::computeBodyJacobianDerivative(
+SerialArmRegressor::MatrixXd
+SerialArmRegressor::computeBodyJacobianDerivative(
     std::size_t body_idx, const VectorXd &q, const VectorXd &qd) const {
   const double eps = 1e-7;
   VectorXd q_plus = q + eps * qd;
@@ -167,7 +167,7 @@ RevoarmNewRegressor::computeBodyJacobianDerivative(
 // ============================================================================
 
 std::size_t
-RevoarmNewRegressor::numParameters(ParamFlags flags) const {
+SerialArmRegressor::numParameters(ParamFlags flags) const {
   std::size_t params = n_bodies_ * InertialParams::PARAMS_PER_BODY;
 
   if (hasFlag(flags, ParamFlags::DAMPING)) {
@@ -177,8 +177,8 @@ RevoarmNewRegressor::numParameters(ParamFlags flags) const {
   return params;
 }
 
-RevoarmNewRegressor::VectorXd
-RevoarmNewRegressor::computeParameterVector(ParamFlags flags) const {
+SerialArmRegressor::VectorXd
+SerialArmRegressor::computeParameterVector(ParamFlags flags) const {
   const std::size_t num_params = numParameters(flags);
   VectorXd theta = VectorXd::Zero(num_params);
 
@@ -199,7 +199,7 @@ RevoarmNewRegressor::computeParameterVector(ParamFlags flags) const {
 }
 
 std::vector<std::string>
-RevoarmNewRegressor::getParameterNames(ParamFlags flags) const {
+SerialArmRegressor::getParameterNames(ParamFlags flags) const {
   std::vector<std::string> names;
 
   const char *param_names[] = {"m",   "mx",  "my",  "mz",  "Ixx",
@@ -225,8 +225,8 @@ RevoarmNewRegressor::getParameterNames(ParamFlags flags) const {
 // 回归矩阵
 // ============================================================================
 
-RevoarmNewRegressor::MatrixXd
-RevoarmNewRegressor::computeBodyRegressorBlock(
+SerialArmRegressor::MatrixXd
+SerialArmRegressor::computeBodyRegressorBlock(
     std::size_t body_idx,
     const std::vector<Matrix4d> &transforms,
     const std::vector<Matrix4d> &transforms_plus,
@@ -328,8 +328,8 @@ RevoarmNewRegressor::computeBodyRegressorBlock(
   return Y_block;
 }
 
-RevoarmNewRegressor::MatrixXd
-RevoarmNewRegressor::computeRegressorMatrix(
+SerialArmRegressor::MatrixXd
+SerialArmRegressor::computeRegressorMatrix(
     const VectorXd &q, const VectorXd &qd, const VectorXd &qdd,
     ParamFlags flags) const {
 
@@ -359,8 +359,8 @@ RevoarmNewRegressor::computeRegressorMatrix(
   return Y;
 }
 
-RevoarmNewRegressor::MatrixXd
-RevoarmNewRegressor::computeObservationMatrix(
+SerialArmRegressor::MatrixXd
+SerialArmRegressor::computeObservationMatrix(
     const MatrixXd &Q, const MatrixXd &Qd, const MatrixXd &Qdd,
     ParamFlags flags) const {
 

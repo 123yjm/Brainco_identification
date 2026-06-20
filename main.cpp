@@ -1,10 +1,10 @@
 /**
  * @file main.cpp
- * @brief brainco_identification — revoarm_new 线性回归辨识入口
+ * @brief brainco_identification — 串联机械臂动力学参数辨识入口
  *
  * 读取 config/identification.yaml 获取配置，支持命令行参数覆盖。
  * 机器人运动学参数从 kinematic_params.yaml 加载。
- * algorithm: 0=基准全部, 1=OLS, 2=WLS, 3=IRLS, 4=TLS, 5=EKF, 6=ML, 8=NLS_FRICTION
+ * algorithm: 0=基准全部, 1=OLS, 2=WLS, 3=IRLS, 4=TLS, 5=EKF, 8=NLS_FRICTION
  *
  * 用法:
  *   ./identify [--config <yaml>] [--data <csv>] [--algo <name>] [--output <yaml>]
@@ -38,13 +38,12 @@ namespace {
 // ---------------------------------------------------------------------------
 const std::unordered_map<int, std::string> ALGO_MAP = {
     {1, "OLS"},          {2, "WLS"},           {3, "IRLS"},
-    {4, "TLS"},          {5, "EKF"},           {6, "ML"},
-    {7, "CLOE"},         {8, "NLS_FRICTION"},
+    {4, "TLS"},          {5, "EKF"},           {8, "NLS_FRICTION"},
 };
 
 // 基准测试所用的算法列表 (algorithm=0 时按此顺序跑全部)
 const std::vector<std::string> BENCHMARK_ALGOS = {
-    "OLS", "WLS", "IRLS", "TLS", "EKF", "ML", "CLOE", "NLS_FRICTION",
+    "OLS", "WLS", "IRLS", "TLS", "EKF", "NLS_FRICTION",
 };
 
 // ---------------------------------------------------------------------------

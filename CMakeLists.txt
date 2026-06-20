@@ -9,7 +9,7 @@ add_library(brainco_id_core
   src/data_loader.cpp
   src/algorithms.cpp
   src/body2inertial.cpp
-  src/revoarm_new_regressor.cpp
+  src/serial_arm_regressor.cpp
   src/robot_config_loader.cpp
   src/regressor_factory.cpp
 )

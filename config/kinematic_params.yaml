@@ -1,4 +1,4 @@
-robot_name: "revoarm_new"
+robot_name: "serial_arm"
 dof: 7
 kinematic_prefix: 2
 

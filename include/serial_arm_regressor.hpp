@@ -7,7 +7,7 @@
 
 namespace robot_dynamics {
 
-class RevoarmNewRegressor : public IDynamicsRegressor {
+class SerialArmRegressor : public IDynamicsRegressor {
 public:
   using Matrix3d = Eigen::Matrix3d;
   using Vector3d = Eigen::Vector3d;
@@ -15,7 +15,7 @@ public:
   using Quaterniond = Eigen::Quaterniond;
 
   /// 从 YAML 配置文件构造（唯一入口）
-  explicit RevoarmNewRegressor(const std::string &yaml_path);
+  explicit SerialArmRegressor(const std::string &yaml_path);
 
   /// 自由度数
   std::size_t nDof() const override { return n_dof_; }

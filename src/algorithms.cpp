@@ -55,10 +55,6 @@ createAlgorithm(const std::string &type, int dof) {
   if (type == "EKF") {
     return std::make_unique<EKF>(0);
   }
-  if (type == "ML")
-    return std::make_unique<ML>();
-  if (type == "CLOE")
-    return std::make_unique<CLOE>();
   if (type == "NLS_FRICTION")
     return std::make_unique<NonlinearFrictionLM>(dof);
 
@@ -201,36 +197,6 @@ Eigen::VectorXd EKF::solve(const Eigen::MatrixXd &W,
   }
 
   return beta;
-}
-
-// =============================================================================
-// ML (using LevenbergMarquardt)
-// =============================================================================
-Eigen::VectorXd ML::solve(const Eigen::MatrixXd &W,
-                          const Eigen::VectorXd &Tau_meas) {
-  int n_params = W.cols();
-
-  LevenbergMarquardt::ResidualFunction residuals =
-      [&](const Eigen::VectorXd &beta) { return W * beta - Tau_meas; };
-
-  LevenbergMarquardt::JacobianFunction jacobian =
-      [&](const Eigen::VectorXd & /*beta*/) {
-        return W;
-      };
-
-  LevenbergMarquardt solver(residuals, jacobian);
-  Eigen::VectorXd beta_init = Eigen::VectorXd::Zero(n_params);
-  return solver.minimize(beta_init);
-}
-
-// =============================================================================
-// CLOE (存根 — 回退到 OLS，因为 RobotDynamics 未包含在此构建中)
-// =============================================================================
-Eigen::VectorXd CLOE::solve(const Eigen::MatrixXd &W,
-                            const Eigen::VectorXd &Tau_meas) {
-  std::cerr << "WARNING: CLOE requires RobotDynamics (not in this build), "
-               "falling back to OLS." << std::endl;
-  return solveRegularized(W, Tau_meas, use_regularization_);
 }
 
 // =============================================================================
