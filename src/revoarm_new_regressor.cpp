@@ -227,10 +227,14 @@ RevoarmNewRegressor::getParameterNames(ParamFlags flags) const {
 
 RevoarmNewRegressor::MatrixXd
 RevoarmNewRegressor::computeBodyRegressorBlock(
-    std::size_t body_idx, const VectorXd &q, const VectorXd &qd,
+    std::size_t body_idx,
+    const std::vector<Matrix4d> &transforms,
+    const std::vector<Matrix4d> &transforms_plus,
+    const VectorXd &qd,
     const VectorXd &qdd) const {
 
-  auto transforms = computeBodyTransforms(q);
+  (void)qd; // qd 已隐含在 transforms_plus 的差分中
+
   Matrix3d R = transforms[body_idx].block<3, 3>(0, 0);
   Vector3d p_origin = transforms[body_idx].block<3, 1>(0, 3);
 
@@ -248,10 +252,7 @@ RevoarmNewRegressor::computeBodyRegressorBlock(
     }
   }
 
-  // 雅可比导数（数值微分）
-  const double dt = 1e-7;
-  VectorXd q_plus = q + dt * qd;
-  auto transforms_plus = computeBodyTransforms(q_plus);
+  // 雅可比导数（数值微分，复用外部传入的 transforms_plus）
   Vector3d p_origin_plus = transforms_plus[body_idx].block<3, 1>(0, 3);
 
   MatrixXd J_world_plus = MatrixXd::Zero(6, n_dof_);
@@ -267,6 +268,7 @@ RevoarmNewRegressor::computeBodyRegressorBlock(
       ++joint_count;
     }
   }
+  const double dt = 1e-7;
   MatrixXd J_world_dot = (J_world_plus - J_world) / dt;
 
   Eigen::Matrix<double, 3, Eigen::Dynamic> Jv_world = J_world.topRows(3);
@@ -334,9 +336,15 @@ RevoarmNewRegressor::computeRegressorMatrix(
   const std::size_t num_params = numParameters(flags);
   MatrixXd Y = MatrixXd::Zero(n_dof_, num_params);
 
+  // 一次 FK，全部刚体共享（而非每个 body 重复计算）
+  auto transforms = computeBodyTransforms(q);
+  const double dt = 1e-7;
+  auto transforms_plus = computeBodyTransforms(q + dt * qd);
+
   for (std::size_t i = 0; i < n_bodies_; ++i) {
     std::size_t body_idx = i + kinematic_prefix_;
-    MatrixXd Y_body = computeBodyRegressorBlock(body_idx, q, qd, qdd);
+    MatrixXd Y_body = computeBodyRegressorBlock(body_idx, transforms,
+                                                 transforms_plus, qd, qdd);
     std::size_t offset = i * InertialParams::PARAMS_PER_BODY;
     Y.block(0, offset, n_dof_, InertialParams::PARAMS_PER_BODY) = Y_body;
   }

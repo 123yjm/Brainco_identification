@@ -70,7 +70,9 @@ private:
   static Matrix3d skew(const Vector3d &v);
   static Matrix4d poseToTransform(const Vector3d &pos, const Quaterniond &quat);
 
-  MatrixXd computeBodyRegressorBlock(std::size_t body_idx, const VectorXd &q,
+  MatrixXd computeBodyRegressorBlock(std::size_t body_idx,
+                                     const std::vector<Matrix4d> &transforms,
+                                     const std::vector<Matrix4d> &transforms_plus,
                                      const VectorXd &qd,
                                      const VectorXd &qdd) const;
 };
