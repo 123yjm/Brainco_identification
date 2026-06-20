@@ -13,7 +13,7 @@
 
 #include "data_loader.hpp"
 #include "algorithms.hpp"
-#include "revoarm_new_regressor.hpp"
+#include "regressor_factory.hpp"
 
 #include <Eigen/Core>
 #include <Eigen/SVD>
@@ -109,6 +109,7 @@ struct Options {
   std::string data_file;
   std::string output_file;
   std::string kinematic_params;
+  std::string robot;        // identification.yaml 中的 robot 字段
   int algorithm = 0;       // 0=基准全部, 1-8 对应具体算法
   std::string algo_name;   // 命令行 --algo 覆盖（优先级最高）
   bool regularization = true;
@@ -134,10 +135,9 @@ Options loadConfig(int argc, char *argv[]) {
   if (cfg.count("algorithm"))       opt.algorithm       = std::stoi(cfg["algorithm"]);
   if (cfg.count("regularization"))  opt.regularization  = (std::stoi(cfg["regularization"]) != 0);
   if (cfg.count("kinematic_params")) opt.kinematic_params = cfg["kinematic_params"];
+  if (cfg.count("robot"))             opt.robot            = cfg["robot"];
 
   // 默认值
-  if (opt.data_file.empty())
-    opt.data_file = "data/revoarm_filtered_data_condnum_56.12_0618.csv";
   if (opt.output_file.empty())
     opt.output_file = "result/identification.yaml";
 
@@ -157,8 +157,9 @@ Options loadConfig(int argc, char *argv[]) {
       opt.damping = false;
   }
 
-  // 路径解析为绝对路径
-  opt.data_file         = resolvePath(opt.data_file);
+  // 路径解析为绝对路径（跳过空字符串）
+  if (!opt.data_file.empty())
+    opt.data_file         = resolvePath(opt.data_file);
   opt.output_file       = resolvePath(opt.output_file);
   if (!opt.kinematic_params.empty())
     opt.kinematic_params = resolvePath(opt.kinematic_params);
@@ -172,6 +173,7 @@ Options loadConfig(int argc, char *argv[]) {
 void saveResults(const std::string &path, const std::string &algo_name,
                  const Eigen::VectorXd &params, std::size_t num_params,
                  double rmse, double max_error,
+                 const std::string &robot_name,
                  bool append_mode = false) {
   std::filesystem::path p(path);
   if (p.has_parent_path())
@@ -194,7 +196,7 @@ void saveResults(const std::string &path, const std::string &algo_name,
     out << "calibration_date: \"" << time_buf << "\"\n";
     out << "evaluation_method: \"torque_residual_rmse\"\n";
     out << "mode: \"BENCHMARK_ALL\"\n";
-    out << "robot: \"revoarm_new\"\n";
+    out << "robot: \"" << robot_name << "\"\n";
     out << "benchmark_results:\n";
   }
 
@@ -217,7 +219,7 @@ struct SingleResult {
 };
 
 SingleResult runSingle(const ExperimentData &data,
-                       const robot_dynamics::RevoarmNewRegressor &regressor,
+                       const robot_dynamics::IDynamicsRegressor &regressor,
                        robot_dynamics::ParamFlags flags,
                        const std::string &algo_name, bool use_reg) {
   const std::size_t num_params = regressor.numParameters(flags);
@@ -267,15 +269,34 @@ SingleResult runSingle(const ExperimentData &data,
 int main(int argc, char *argv[]) {
   Options opt = loadConfig(argc, argv);
 
-  // ---- 加载机器人模型 -----------------------------------------------------
+  // ---- 校验必填字段 -------------------------------------------------------
+  if (opt.robot.empty()) {
+    std::cerr << "错误: 缺少必填配置项 robot (identification.yaml 中的 robot 字段)"
+              << std::endl;
+    return 1;
+  }
   if (opt.kinematic_params.empty()) {
     std::cerr << "错误: 缺少必填配置项 kinematic_params (机器人运动学参数 YAML 路径)"
               << std::endl;
     return 1;
   }
-  std::cout << "加载机器人模型: " << opt.kinematic_params << std::endl;
-  robot_dynamics::RevoarmNewRegressor regressor(opt.kinematic_params);
-  const std::size_t DOF = regressor.nDof();
+  if (opt.data_file.empty()) {
+    std::cerr << "错误: 缺少必填配置项 data_file (数据 CSV 路径)" << std::endl;
+    return 1;
+  }
+
+  // ---- 加载机器人模型 -----------------------------------------------------
+  std::cout << "加载机器人模型: " << opt.robot
+            << " (" << opt.kinematic_params << ")" << std::endl;
+  std::unique_ptr<robot_dynamics::IDynamicsRegressor> regressor;
+  try {
+    regressor = robot_dynamics::RegressorFactory::create(opt.robot,
+                                                          opt.kinematic_params);
+  } catch (const std::exception &e) {
+    std::cerr << "错误: " << e.what() << std::endl;
+    return 1;
+  }
+  const std::size_t DOF = regressor->nDof();
 
   // ---- 加载数据 -----------------------------------------------------------
   std::cout << "加载数据: " << opt.data_file << std::endl;
@@ -292,7 +313,7 @@ int main(int argc, char *argv[]) {
   auto flags = robot_dynamics::ParamFlags::NONE;
   if (opt.damping)  flags = flags | robot_dynamics::ParamFlags::DAMPING;
 
-  const std::size_t num_params = regressor.numParameters(flags);
+  const std::size_t num_params = regressor->numParameters(flags);
   std::cout << "参数数: " << num_params
             << "  (damping=" << (opt.damping ? "yes" : "no")
             << ", regularization=" << (opt.regularization ? "yes" : "no") << ")"
@@ -325,10 +346,11 @@ int main(int argc, char *argv[]) {
   bool append = false;
   for (const auto &algo : algos_to_run) {
     std::cout << "\n--- " << algo << " ---" << std::endl;
-    auto r = runSingle(data, regressor, flags, algo, opt.regularization);
+    auto r = runSingle(data, *regressor, flags, algo, opt.regularization);
     std::cout << algo << " => RMSE: " << r.rmse << " Nm, Max Error: "
               << r.max_err << " Nm" << std::endl;
-    saveResults(opt.output_file, algo, r.beta, num_params, r.rmse, r.max_err, append);
+    saveResults(opt.output_file, algo, r.beta, num_params, r.rmse, r.max_err,
+                opt.robot, append);
     append = true; // 后续算法追加写入
     if (r.beta.size() > 0) results.push_back(r);
   }

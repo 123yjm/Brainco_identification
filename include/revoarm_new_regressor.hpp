@@ -1,16 +1,14 @@
 #pragma once
 
-#include "body2inertial.hpp"
+#include "dynamics_regressor.hpp"
 
 #include <string>
 #include <vector>
 
 namespace robot_dynamics {
 
-class RevoarmNewRegressor {
+class RevoarmNewRegressor : public IDynamicsRegressor {
 public:
-  using VectorXd = Eigen::VectorXd;
-  using MatrixXd = Eigen::MatrixXd;
   using Matrix3d = Eigen::Matrix3d;
   using Vector3d = Eigen::Vector3d;
   using Matrix4d = Eigen::Matrix4d;
@@ -20,28 +18,28 @@ public:
   explicit RevoarmNewRegressor(const std::string &yaml_path);
 
   /// 自由度数
-  std::size_t nDof() const { return n_dof_; }
+  std::size_t nDof() const override { return n_dof_; }
 
   /// 用于辨识的刚体数量（不含 kinematic prefix）
-  std::size_t nBodies() const { return n_bodies_; }
+  std::size_t nBodies() const override { return n_bodies_; }
 
   VectorXd
-  computeParameterVector(ParamFlags flags = ParamFlags::ALL) const;
+  computeParameterVector(ParamFlags flags = ParamFlags::ALL) const override;
 
   std::size_t
-  numParameters(ParamFlags flags = ParamFlags::ALL) const;
+  numParameters(ParamFlags flags = ParamFlags::ALL) const override;
 
   MatrixXd
   computeRegressorMatrix(const VectorXd &q, const VectorXd &qd,
                          const VectorXd &qdd,
-                         ParamFlags flags = ParamFlags::ALL) const;
+                         ParamFlags flags = ParamFlags::ALL) const override;
 
   MatrixXd computeObservationMatrix(
       const MatrixXd &Q, const MatrixXd &Qd, const MatrixXd &Qdd,
-      ParamFlags flags = ParamFlags::ALL) const;
+      ParamFlags flags = ParamFlags::ALL) const override;
 
   std::vector<std::string>
-  getParameterNames(ParamFlags flags = ParamFlags::ALL) const;
+  getParameterNames(ParamFlags flags = ParamFlags::ALL) const override;
 
 private:
   std::size_t n_dof_ = 0;

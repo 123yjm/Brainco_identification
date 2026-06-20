@@ -11,6 +11,7 @@ add_library(brainco_id_core
   src/body2inertial.cpp
   src/revoarm_new_regressor.cpp
   src/robot_config_loader.cpp
+  src/regressor_factory.cpp
 )
 target_include_directories(brainco_id_core PUBLIC include ${EIGEN3_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIR})
 target_link_libraries(brainco_id_core PUBLIC Eigen3::Eigen ${YAML_CPP_LIBRARIES})
