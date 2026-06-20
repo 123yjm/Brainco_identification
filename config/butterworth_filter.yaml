@@ -1,0 +1,29 @@
+# Butterworth Filter Configuration
+# ================================
+# 用于对原始激励轨迹采样数据进行低通滤波预处理。
+# 参数与 MATLAB 脚本 data/revoarm_filter.m 保持一致。
+
+io:
+  # 输入：43 列无表头的逗号分隔 .txt 文件
+  # 列序：t_abs, q(1-7), q_dot(1-7), motor_current(1-7), qd(1-7), qd_dot(1-7), qd_ddot(1-7)
+  input_txt: data/revoarm_right_data_read_excitation_56.12_0618.txt
+
+  # 输出：29 列带表头的 CSV 文件
+  # 列序：time, q0..q6, qd0..qd6, qdd0..qdd6, tau0..tau6
+  output_csv: result/filtered_data.csv
+
+filter:
+  # 采样频率 (Hz)
+  sampling_frequency_hz: 100
+
+  # 通带频率 (Hz)
+  passband_hz: 0.5
+
+  # 阻带频率 (Hz)
+  stopband_hz: 4
+
+  # 通带波纹 (dB)
+  passband_ripple_db: 1
+
+  # 阻带衰减 (dB)
+  stopband_attenuation_db: 50

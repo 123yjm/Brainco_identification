@@ -6,5 +6,6 @@ kinematic_params: "config/kinematic_params.yaml"
 algorithm: 0
 # regularization: 1 开启 Tikhonov 正则化 (默认), 0 关闭
 regularization: 1
-data_file: "data/revoarm_filtered_data_condnum_56.12_0618.csv"
+# data_file: "data/revoarm_filtered_data_condnum_56.12_0618.csv"
+data_file: "result/filtered_data.csv"
 output_file: "result/identification.yaml"
