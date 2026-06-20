@@ -17,10 +17,10 @@ filter:
   sampling_frequency_hz: 100
 
   # 通带频率 (Hz)
-  passband_hz: 0.5
+  passband_hz: 2
 
   # 阻带频率 (Hz)
-  stopband_hz: 4
+  stopband_hz: 10
 
   # 通带波纹 (dB)
   passband_ripple_db: 1

@@ -6,7 +6,7 @@
 |---|---|---|
 | `filter_data` | `main_filter.cpp` | 巴特沃斯低通滤波数据预处理 |
 | `get_traj` | `main_traj.cpp` | 傅里叶级数激励轨迹优化 |
-| `identify` | `main.cpp` | 动力学参数辨识（6 种算法） |
+| `identify` | `main_solve.cpp` | 动力学参数辨识（6 种算法） |
 
 ---
 

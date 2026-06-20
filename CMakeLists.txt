@@ -21,7 +21,7 @@ add_library(brainco_id_core
 target_include_directories(brainco_id_core PUBLIC include ${EIGEN3_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIR} ${NLOPT_INCLUDE_DIRS})
 target_link_libraries(brainco_id_core PUBLIC Eigen3::Eigen ${YAML_CPP_LIBRARIES} ${NLOPT_LIBRARIES})
 
-add_executable(identify main.cpp)
+add_executable(identify main_solve.cpp)
 target_compile_definitions(identify PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(identify PRIVATE brainco_id_core)
 

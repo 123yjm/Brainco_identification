@@ -11,6 +11,7 @@
 
 robot: "serial_arm"
 kinematic_params: "config/kinematic_params.yaml"
+output_trajectory: "result/excitation_trajectory.csv"
 
 # --- 傅里叶级数参数 ---   
 fourier_order: 5               # 傅里叶阶数 N
@@ -36,5 +37,4 @@ multi_start_count: 8             # 多起点随机初始化次数
 max_iterations: 15000            # 每次运行最大目标函数评估次数
 ftol_rel: 1.0e-10               # 目标函数相对收敛容差
 
-# --- 输出 ---
-output_trajectory: "result/excitation_trajectory.csv"
+
