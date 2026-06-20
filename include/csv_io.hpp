@@ -6,10 +6,9 @@
 
 namespace signal_processing {
 
-/// Configuration loaded from butterworth_filter.yaml.
+/// Filter parameters loaded from butterworth_filter.yaml.
+/// I/O paths are auto-derived from the robot directory by entry points.
 struct FilterConfig {
-    std::string input_txt;
-    std::string output_csv;
     double fs = 100.0;
     double passband_hz = 5.0;
     double stopband_hz = 10.0;
@@ -41,15 +40,11 @@ struct FilteredOutputData {
     int n_dof = 7;
 };
 
-/// Load filter configuration from a YAML file (uses yaml-cpp).
-///
-/// Relative paths inside the config are resolved against `base_dir`.
+/// Load filter parameters from a YAML file (uses yaml-cpp).
 ///
 /// @param yaml_path  Path to the YAML configuration file
-/// @param base_dir   Base directory for resolving relative paths (usually PROJECT_ROOT_DIR)
 /// @return           Populated FilterConfig
-FilterConfig loadFilterConfig(const std::string& yaml_path,
-                              const std::string& base_dir);
+FilterConfig loadFilterConfig(const std::string& yaml_path);
 
 /// Read a 43-column headerless comma-separated .txt file.
 ///

@@ -1,4 +1,4 @@
-robot_name: "serial_arm"
+robot_type: "serial_arm"
 dof: 7
 kinematic_prefix: 2
 

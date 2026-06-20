@@ -127,8 +127,8 @@ struct FourierTrajectoryParams {
 // ============================================================================
 
 struct ExcitationTrajectoryConfig {
-  std::string robot_name;
-  std::string kinematic_params_path;
+  // robot_name / kinematic_params_path / output_trajectory_path
+  // 由入口函数根据 --robot 目录自动推导，不再存储于此。
 
   int fourier_order = 5;
   double sampling_time = 10.0;        ///< 激励轨迹运行时长 (秒)
@@ -147,8 +147,6 @@ struct ExcitationTrajectoryConfig {
   int multi_start_count = 8;
   int max_iterations = 15000;
   double ftol_rel = 1e-10;
-
-  std::string output_trajectory_path;
 };
 
 // ============================================================================
@@ -174,7 +172,11 @@ struct ExcitationTrajectoryResult {
 class ExcitationTrajectoryOptimizer {
 public:
   /// @param cfg 优化配置 (含关节限位、初始角等)
-  explicit ExcitationTrajectoryOptimizer(const ExcitationTrajectoryConfig &cfg);
+  /// @param robot_name 机器人类型名（传给 RegressorFactory）
+  /// @param kinematic_params_path 运动学参数 YAML 路径
+  ExcitationTrajectoryOptimizer(const ExcitationTrajectoryConfig &cfg,
+                                const std::string &robot_name,
+                                const std::string &kinematic_params_path);
 
   /// 运行多起点优化，返回最优结果
   ExcitationTrajectoryResult optimize();

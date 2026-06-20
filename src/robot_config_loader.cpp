@@ -46,11 +46,11 @@ RobotConfig loadKinematicConfig(const std::string &yaml_path) {
 
   RobotConfig cfg;
 
-  // ---- 顶层必填字段 ----
-  if (!root["robot_name"]) {
-    throw std::runtime_error("缺少必填字段: robot_name");
+  // ---- 顶层字段 ----
+  // robot_name 为可选（未填则留空，由入口函数根据目录名设置）
+  if (root["robot_name"]) {
+    cfg.robot_name = root["robot_name"].as<std::string>();
   }
-  cfg.robot_name = root["robot_name"].as<std::string>();
 
   if (!root["dof"]) {
     throw std::runtime_error("缺少必填字段: dof");

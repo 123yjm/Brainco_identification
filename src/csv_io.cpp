@@ -23,13 +23,6 @@ std::vector<std::string> splitLine(const std::string& line, char delim) {
     return tokens;
 }
 
-/// Resolve a possibly-relative path against base_dir.
-std::string resolvePath(const std::string& path, const std::string& base_dir) {
-    if (path.empty()) return path;
-    if (path[0] == '/') return path;  // already absolute
-    return base_dir + "/" + path;
-}
-
 }  // anonymous namespace
 
 namespace signal_processing {
@@ -38,21 +31,9 @@ namespace signal_processing {
 //  YAML Config Loader
 // ---------------------------------------------------------------------------
 
-FilterConfig loadFilterConfig(const std::string& yaml_path,
-                              const std::string& base_dir) {
+FilterConfig loadFilterConfig(const std::string& yaml_path) {
     FilterConfig cfg;
     YAML::Node root = YAML::LoadFile(yaml_path);
-
-    // --- io section ---
-    if (root["io"]) {
-        auto io = root["io"];
-        if (io["input_txt"]) {
-            cfg.input_txt = resolvePath(io["input_txt"].as<std::string>(), base_dir);
-        }
-        if (io["output_csv"]) {
-            cfg.output_csv = resolvePath(io["output_csv"].as<std::string>(), base_dir);
-        }
-    }
 
     // --- filter section ---
     if (root["filter"]) {

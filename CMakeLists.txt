@@ -17,6 +17,7 @@ add_library(brainco_id_core
   src/robot_config_loader.cpp
   src/regressor_factory.cpp
   src/trajectory_optimizer.cpp
+  src/robot_utils.cpp
 )
 target_include_directories(brainco_id_core PUBLIC include ${EIGEN3_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIR} ${NLOPT_INCLUDE_DIRS})
 target_link_libraries(brainco_id_core PUBLIC Eigen3::Eigen ${YAML_CPP_LIBRARIES} ${NLOPT_LIBRARIES})
@@ -45,6 +46,7 @@ target_link_libraries(identify_gui PRIVATE Qt5::Widgets ${YAML_CPP_LIBRARIES})
 add_library(brainco_id_filter
   src/butterworth_filter.cpp
   src/csv_io.cpp
+  src/robot_utils.cpp
 )
 target_include_directories(brainco_id_filter PUBLIC include ${EIGEN3_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIR})
 target_link_libraries(brainco_id_filter PUBLIC Eigen3::Eigen ${YAML_CPP_LIBRARIES})

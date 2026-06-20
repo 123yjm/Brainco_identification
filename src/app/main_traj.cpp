@@ -1,79 +1,73 @@
 /**
  * @file main_traj.cpp
- * @brief get_traj — 傅里叶激励轨迹优化独立入口
+ * @brief 傅里叶激励轨迹优化入口
  *
- * 读取 config/excite_trajectory.yaml，优化 5 阶傅里叶级数系数 (a, b, c)。
- * D-最优准则: max det(W^T W)，COBYLA + SLSQP 两阶段求解。
- *
- * 用法:
- *   ./get_traj [--config <excite_trajectory.yaml>]
+ * 用法: ./get_traj --robot <robot_dir> [--help]
  */
 
+#include "robot_utils.hpp"
 #include "trajectory_optimizer.hpp"
-#include "regressor_factory.hpp"
+
+#include <yaml-cpp/yaml.h>
 
 #include <cstdlib>
-#include <filesystem>
 #include <iostream>
 #include <string>
 
-// ---------------------------------------------------------------------------
-// 项目根目录
-// ---------------------------------------------------------------------------
-#ifndef PROJECT_ROOT_DIR
-#define PROJECT_ROOT_DIR "."
-#endif
+namespace {
 
-inline std::string resolvePath(const std::string &path) {
-  std::filesystem::path p(path);
-  if (p.is_absolute()) return path;
-  return (std::filesystem::path(PROJECT_ROOT_DIR) / p).string();
+void printHelp(const char* prog) {
+    std::cout << "傅里叶激励轨迹优化\n"
+              << "用法: " << prog << " --robot <robot_dir>\n\n"
+              << "选项:\n"
+              << "  --robot <dir>  机器人目录 (如 robots/revoarm_right)\n"
+              << "  --help         打印帮助信息\n";
 }
 
-// ============================================================================
-int main(int argc, char *argv[]) {
-  std::string config_path = "config/excite_trajectory.yaml";
+}  // anonymous namespace
 
-  // 解析命令行参数
-  for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[i];
-    if (arg == "--config" && i + 1 < argc) {
-      config_path = argv[++i];
+int main(int argc, char* argv[]) {
+    std::string robot_dir;
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help") { printHelp(argv[0]); return 0; }
+        else if (arg == "--robot" && i + 1 < argc) robot_dir = argv[++i];
     }
-  }
-  config_path = resolvePath(config_path);
 
-  std::cout << "==============================================" << std::endl;
-  std::cout << "  激励轨迹优化 — 5 阶傅里叶级数" << std::endl;
-  std::cout << "  D-最优准则: max det(W^T W)" << std::endl;
-  std::cout << "==============================================" << std::endl;
-  std::cout << "配置文件: " << config_path << std::endl;
+    if (robot_dir.empty()) {
+        std::cerr << "错误: 需要 --robot <dir>\n";
+        return 1;
+    }
 
-  // 加载配置
-  excitation_trajectory::ExcitationTrajectoryConfig excite_cfg;
-  try {
-    excite_cfg = excitation_trajectory::loadExciteTrajectoryConfig(config_path);
-  } catch (const std::exception &e) {
-    std::cerr << "错误: 无法加载配置文件 — " << e.what() << std::endl;
-    return 1;
-  }
+    std::string robot_name = robot_utils::robotNameFromDir(robot_dir);
+    std::string config_yaml = robot_utils::configPath(robot_dir, "excite_trajectory.yaml");
+    std::string kinematic_yaml = robot_utils::configPath(robot_dir, "kinematic_params.yaml");
+    std::string output_csv = robot_utils::resultPath(robot_dir,
+        robot_name + "_excitation_trajectory.csv");
 
-  // 路径解析
-  if (!excite_cfg.kinematic_params_path.empty())
-    excite_cfg.kinematic_params_path =
-        resolvePath(excite_cfg.kinematic_params_path);
-  if (!excite_cfg.output_trajectory_path.empty())
-    excite_cfg.output_trajectory_path =
-        resolvePath(excite_cfg.output_trajectory_path);
+    // 读取 robot_type
+    std::string robot_type = robot_name;
+    try {
+        auto kroot = YAML::LoadFile(kinematic_yaml);
+        if (kroot["robot_type"]) robot_type = kroot["robot_type"].as<std::string>();
+    } catch (...) {}
 
-  // 运行优化
-  excitation_trajectory::ExcitationTrajectoryOptimizer optimizer(excite_cfg);
-  auto result = optimizer.optimize();
+    std::cout << "═══════════════════════════════════════════\n"
+              << "  激励轨迹优化\n"
+              << "═══════════════════════════════════════════\n"
+              << "机器人:     " << robot_name << " (type: " << robot_type << ")\n"
+              << "配置:       " << config_yaml << "\n"
+              << "运动学:     " << kinematic_yaml << "\n"
+              << "输出:       " << output_csv << std::endl;
 
-  // 保存轨迹
-  if (!excite_cfg.output_trajectory_path.empty())
-    optimizer.saveTrajectoryCSV(result, excite_cfg.output_trajectory_path);
+    auto cfg = excitation_trajectory::loadExciteTrajectoryConfig(config_yaml);
+    excitation_trajectory::ExcitationTrajectoryOptimizer optimizer(
+        cfg, robot_type, kinematic_yaml);
 
-  std::cout << "\n完成。" << std::endl;
-  return 0;
+    auto result = optimizer.optimize();
+    optimizer.saveTrajectoryCSV(result, output_csv);
+
+    std::cout << "\n完成: " << output_csv << std::endl;
+    return 0;
 }

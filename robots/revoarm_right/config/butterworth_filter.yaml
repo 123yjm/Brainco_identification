@@ -1,0 +1,9 @@
+# Butterworth Filter Configuration — revoarm_right
+# I/O 路径由入口函数根据 --robot 目录自动推导，无需在此配置。
+
+filter:
+  sampling_frequency_hz: 100
+  passband_hz: 5
+  stopband_hz: 10
+  passband_ripple_db: 3
+  stopband_attenuation_db: 30

@@ -213,23 +213,25 @@ void FourierTrajectoryParams::evaluateAtZero(
 // ============================================================================
 
 ExcitationTrajectoryOptimizer::ExcitationTrajectoryOptimizer(
-    const ExcitationTrajectoryConfig &cfg)
+    const ExcitationTrajectoryConfig &cfg,
+    const std::string &robot_name,
+    const std::string &kinematic_params_path)
     : cfg_(cfg) {
   dof_ = static_cast<int>(cfg_.q_init.size());
   n_vars_ = dof_ * (2 * cfg_.fourier_order + 1);
 
   // 通过工厂创建回归器
-  regressor_ = robot_dynamics::RegressorFactory::create(cfg_.robot_name,
-                                                         cfg_.kinematic_params_path);
+  regressor_ = robot_dynamics::RegressorFactory::create(robot_name,
+                                                         kinematic_params_path);
   if (!regressor_) {
-    throw std::runtime_error("无法创建机器人回归器: " + cfg_.robot_name);
+    throw std::runtime_error("无法创建机器人回归器: " + robot_name);
   }
 
   auto flags = robot_dynamics::ParamFlags::ALL;
   num_params_ = static_cast<int>(regressor_->numParameters(flags));
 
   std::cout << "激励轨迹优化初始化:" << std::endl;
-  std::cout << "  机器人: " << cfg_.robot_name << std::endl;
+  std::cout << "  机器人: " << robot_name << std::endl;
   std::cout << "  DOF: " << dof_ << std::endl;
   std::cout << "  参数数: " << num_params_ << std::endl;
   std::cout << "  优化变量数: " << n_vars_ << std::endl;
@@ -635,9 +637,7 @@ loadExciteTrajectoryConfig(const std::string &path) {
 
   ExcitationTrajectoryConfig cfg;
 
-  // ---- 必填字段 ----
-  cfg.robot_name = root["robot"].as<std::string>();
-  cfg.kinematic_params_path = root["kinematic_params"].as<std::string>();
+  // robot_name / kinematic_params_path / output_trajectory_path 由入口函数传入
 
   // ---- 傅里叶参数 ----
   if (root["fourier_order"])
@@ -679,10 +679,6 @@ loadExciteTrajectoryConfig(const std::string &path) {
     cfg.max_iterations = root["max_iterations"].as<int>();
   if (root["ftol_rel"])
     cfg.ftol_rel = root["ftol_rel"].as<double>();
-
-  // ---- 输出路径 ----
-  if (root["output_trajectory"])
-    cfg.output_trajectory_path = root["output_trajectory"].as<std::string>();
 
   return cfg;
 }

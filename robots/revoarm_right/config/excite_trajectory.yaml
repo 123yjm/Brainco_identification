@@ -1,0 +1,18 @@
+# Excitation Trajectory Optimization — revoarm_right
+# robot / kinematic_params / output_trajectory 由入口函数自动推导。
+
+fourier_order: 5
+sampling_time: 10.0
+sampling_frequency: 10
+trajectory_frequency: 100
+
+q_init: [-1.5, 0.15, 0.0, 0.0, -1.725, 0.0, 0.0]
+q_min: [-2.5, -0.15, -2.09, -0.3, -4.0, -0.54, -1.57]
+q_max: [ 0.7,  1.65,  2.09,  2.21, 0.55,  0.54,  1.57]
+
+q_dot_max:  [1.396, 1.396, 1.396, 1.396, 1.396, 1.396, 1.396]
+q_ddot_max: [4.189, 4.189, 4.189, 4.189, 4.189, 4.189, 4.189]
+
+multi_start_count: 8
+max_iterations: 15000
+ftol_rel: 1.0e-10

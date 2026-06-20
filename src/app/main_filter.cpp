@@ -1,19 +1,13 @@
 /**
  * @file main_filter.cpp
- * @brief 巴特沃斯低通滤波数据预处理入口（独立可执行文件）
+ * @brief 巴特沃斯低通滤波数据预处理入口
  *
- * 读取 43 列原始激励轨迹采样 .txt 文件，设计数字 Butterworth 低通滤波器，
- * 进行零相位滤波 + 中心差分加速度计算，输出 29 列 CSV 文件。
- *
- * 用法:
- *   ./filter_data [--config <yaml>] [--input <txt>] [--output <csv>]
- *                 [--passband <Hz>] [--stopband <Hz>] [--help]
- *
- * 默认配置: config/butterworth_filter.yaml
+ * 用法: ./filter_data --robot <robot_dir> [--passband <Hz>] [--stopband <Hz>] [--help]
  */
 
 #include "butterworth_filter.hpp"
 #include "csv_io.hpp"
+#include "robot_utils.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -21,212 +15,108 @@
 #include <iostream>
 #include <string>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-#ifndef PROJECT_ROOT_DIR
-#define PROJECT_ROOT_DIR "."
-#endif
-
-using signal_processing::FilterConfig;
-
 namespace {
 
-// ---------------------------------------------------------------------------
-// 路径解析
-// ---------------------------------------------------------------------------
-inline std::string resolvePath(const std::string& path) {
-    std::filesystem::path p(path);
-    if (p.is_absolute()) return path;
-    return (std::filesystem::path(PROJECT_ROOT_DIR) / p).string();
-}
-
-// ---------------------------------------------------------------------------
-// 运行时配置（YAML + 命令行覆盖）
-// ---------------------------------------------------------------------------
-struct RuntimeOptions {
-    std::string config_file = "config/butterworth_filter.yaml";
-    FilterConfig filter_cfg;
-};
-
-// ---------------------------------------------------------------------------
-// 打印帮助信息
-// ---------------------------------------------------------------------------
-void printHelp(const char* prog_name) {
-    std::cout << "巴特沃斯滤波器 — 激励轨迹数据预处理\n"
-              << "用法: " << prog_name << " [选项]\n\n"
+void printHelp(const char* prog) {
+    std::cout << "巴特沃斯滤波器 — 数据预处理\n"
+              << "用法: " << prog << " --robot <robot_dir> [选项]\n\n"
               << "选项:\n"
-              << "  --config <yaml>    YAML 配置文件 (默认: config/butterworth_filter.yaml)\n"
-              << "  --input <txt>      覆盖输入 .txt 文件路径\n"
-              << "  --output <csv>     覆盖输出 .csv 文件路径\n"
-              << "  --passband <Hz>    覆盖通带频率\n"
-              << "  --stopband <Hz>    覆盖阻带频率\n"
-              << "  --help             打印本帮助信息并退出\n"
-              << std::endl;
-}
-
-// ---------------------------------------------------------------------------
-// 加载配置并解析命令行参数
-// ---------------------------------------------------------------------------
-RuntimeOptions parseOptions(int argc, char* argv[]) {
-    RuntimeOptions opts;
-
-    // 第一遍: 解析 --config
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "--config" && i + 1 < argc) {
-            opts.config_file = argv[++i];
-        } else if (arg == "--help") {
-            printHelp(argv[0]);
-            std::exit(0);
-        }
-    }
-
-    // 加载 YAML 配置
-    std::string config_path = resolvePath(opts.config_file);
-    opts.filter_cfg = signal_processing::loadFilterConfig(config_path, PROJECT_ROOT_DIR);
-
-    // 第二遍: 命令行覆盖
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "--config" && i + 1 < argc) {
-            ++i;  // skip value
-        } else if (arg == "--input" && i + 1 < argc) {
-            opts.filter_cfg.input_txt = resolvePath(argv[++i]);
-        } else if (arg == "--output" && i + 1 < argc) {
-            opts.filter_cfg.output_csv = resolvePath(argv[++i]);
-        } else if (arg == "--passband" && i + 1 < argc) {
-            opts.filter_cfg.passband_hz = std::stod(argv[++i]);
-        } else if (arg == "--stopband" && i + 1 < argc) {
-            opts.filter_cfg.stopband_hz = std::stod(argv[++i]);
-        } else if (arg == "--help") {
-            printHelp(argv[0]);
-            std::exit(0);
-        }
-    }
-
-    return opts;
+              << "  --robot <dir>       机器人目录 (如 robots/revoarm_right)\n"
+              << "  --passband <Hz>     覆盖通带频率\n"
+              << "  --stopband <Hz>     覆盖阻带频率\n"
+              << "  --help              打印帮助信息\n";
 }
 
 }  // anonymous namespace
 
-// ============================================================================
 int main(int argc, char* argv[]) {
-    RuntimeOptions opts = parseOptions(argc, argv);
-    const FilterConfig& cfg = opts.filter_cfg;
+    // ---- 解析 --help / --robot --------------------------------------------
+    std::string robot_dir;
+    double passband_override = -1, stopband_override = -1;
 
-    // ---- 1. 打印配置 --------------------------------------------------------
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help") { printHelp(argv[0]); return 0; }
+        else if (arg == "--robot" && i + 1 < argc) robot_dir = argv[++i];
+        else if (arg == "--passband" && i + 1 < argc) passband_override = std::stod(argv[++i]);
+        else if (arg == "--stopband" && i + 1 < argc) stopband_override = std::stod(argv[++i]);
+    }
+
+    if (robot_dir.empty()) {
+        std::cerr << "错误: 需要 --robot <dir>\n";
+        printHelp(argv[0]);
+        return 1;
+    }
+
+    std::string robot_name = robot_utils::robotNameFromDir(robot_dir);
+
+    // ---- 1. 加载配置 ------------------------------------------------------
+    std::string filter_yaml = robot_utils::configPath(robot_dir, "butterworth_filter.yaml");
+    signal_processing::FilterConfig cfg = signal_processing::loadFilterConfig(filter_yaml);
+    if (passband_override > 0) cfg.passband_hz = passband_override;
+    if (stopband_override > 0) cfg.stopband_hz = stopband_override;
+
+    std::string input_txt = robot_utils::findFirstFile(
+        robot_utils::dataPath(robot_dir, ""), "*.txt");
+    if (input_txt.empty()) {
+        std::cerr << "错误: 在 " << robot_utils::dataPath(robot_dir, "")
+                  << " 下未找到 .txt 文件\n";
+        return 1;
+    }
+
+    std::string output_csv = robot_utils::resultPath(robot_dir,
+        robot_name + "_filtered_data.csv");
+
+    // ---- 2. 打印配置 ------------------------------------------------------
     std::cout << "═══════════════════════════════════════════\n"
               << "  Butterworth 滤波器 — 数据预处理\n"
               << "═══════════════════════════════════════════\n"
-              << "配置文件:     " << opts.config_file << "\n"
-              << "输入文件:     " << cfg.input_txt << "\n"
-              << "输出文件:     " << cfg.output_csv << "\n"
-              << "采样频率:     " << cfg.fs << " Hz\n"
-              << "通带频率:     " << cfg.passband_hz << " Hz\n"
-              << "阻带频率:     " << cfg.stopband_hz << " Hz\n"
-              << "通带波纹:     " << cfg.rp_db << " dB\n"
-              << "阻带衰减:     " << cfg.rs_db << " dB\n"
+              << "机器人:       " << robot_name << "\n"
+              << "输入:         " << input_txt << "\n"
+              << "输出:         " << output_csv << "\n"
+              << "通带:         " << cfg.passband_hz << " Hz\n"
+              << "阻带:         " << cfg.stopband_hz << " Hz\n"
               << std::endl;
 
-    // ---- 2. 读取原始数据 ----------------------------------------------------
-    std::cout << "读取原始数据..." << std::endl;
+    // ---- 3. 读取原始数据 --------------------------------------------------
     signal_processing::RawMeasurementData raw;
     try {
-        raw = signal_processing::readRawTxt(cfg.input_txt);
+        raw = signal_processing::readRawTxt(input_txt);
     } catch (const std::exception& e) {
         std::cerr << "错误: " << e.what() << std::endl;
         return 1;
     }
-    std::cout << "  样本数: " << raw.n_samples
-              << ", 自由度: " << raw.n_dof << std::endl;
+    std::cout << "样本数: " << raw.n_samples << ", DOF: " << raw.n_dof << std::endl;
 
-    // ---- 3. 设计滤波器 ------------------------------------------------------
+    // ---- 4. 设计滤波器 ----------------------------------------------------
     double fs = cfg.fs;
     double Wp = cfg.passband_hz / (fs / 2.0);
     double Ws = cfg.stopband_hz / (fs / 2.0);
 
-    std::cout << "\n设计 Butterworth 低通滤波器...\n"
-              << "  归一化通带: " << Wp << "\n"
-              << "  归一化阻带: " << Ws << std::endl;
+    auto design = signal_processing::designButterworthLowpass(
+        Wp, Ws, cfg.rp_db, cfg.rs_db, fs);
+    std::cout << "滤波器阶数: " << design.order
+              << ", 截止频率: " << design.cutoff_normalized << std::endl;
 
-    signal_processing::ButterworthFilterDesign design;
-    try {
-        design = signal_processing::designButterworthLowpass(
-            Wp, Ws, cfg.rp_db, cfg.rs_db, fs);
-    } catch (const std::exception& e) {
-        std::cerr << "滤波器设计失败: " << e.what() << std::endl;
-        return 1;
-    }
-
-    std::cout << "  滤波器阶数: " << design.order << "\n"
-              << "  归一化截止频率: " << design.cutoff_normalized << "\n"
-              << "  分子系数 b: [";
-    for (int i = 0; i <= design.order; ++i) {
-        if (i > 0) std::cout << ", ";
-        std::cout << design.b(i);
-    }
-    std::cout << "]\n  分母系数 a: [";
-    for (int i = 0; i <= design.order; ++i) {
-        if (i > 0) std::cout << ", ";
-        std::cout << design.a(i);
-    }
-    std::cout << "]" << std::endl;
-
-    // ---- 4. 滤波 ------------------------------------------------------------
+    // ---- 5. 滤波 ----------------------------------------------------------
     double Ts = 1.0 / fs;
-    std::cout << "\n应用零相位滤波..." << std::endl;
-
     signal_processing::FilteredOutputData filtered;
     filtered.n_samples = raw.n_samples;
     filtered.n_dof = raw.n_dof;
 
-    // 相对时间
     filtered.time.resize(raw.n_samples);
     double t0 = raw.t_abs[0];
-    for (int i = 0; i < raw.n_samples; ++i) {
-        filtered.time[i] = raw.t_abs[i] - t0;
-    }
+    for (int i = 0; i < raw.n_samples; ++i) filtered.time[i] = raw.t_abs[i] - t0;
 
-    // q_filtered = q (不滤波，直接复制)
-    filtered.q_filtered = raw.q;
-    std::cout << "  q:           不滤波，直接复制" << std::endl;
+    filtered.q_filtered      = raw.q;
+    filtered.q_dot_filtered  = signal_processing::filtfilt(design.b, design.a, raw.q_dot);
+    filtered.q_ddot_filtered = signal_processing::centralDifference(filtered.q_dot_filtered, Ts);
+    filtered.tau_filtered    = signal_processing::filtfilt(design.b, design.a, raw.motor_current);
 
-    // q_dot_filtered = filtfilt(q_dot)
-    filtered.q_dot_filtered = signal_processing::filtfilt(
-        design.b, design.a, raw.q_dot);
-    std::cout << "  q_dot:       零相位滤波完成" << std::endl;
+    // ---- 6. 写入 CSV ------------------------------------------------------
+    std::filesystem::create_directories(robot_utils::resultPath(robot_dir, ""));
+    signal_processing::writeFilteredCsv(output_csv, filtered);
 
-    // q_ddot_filtered = centralDifference(q_dot_filtered)
-    filtered.q_ddot_filtered = signal_processing::centralDifference(
-        filtered.q_dot_filtered, Ts);
-    std::cout << "  q_ddot:      中心差分计算完成 (Ts = " << Ts << " s)" << std::endl;
-
-    // tau_filtered = filtfilt(motor_current)
-    filtered.tau_filtered = signal_processing::filtfilt(
-        design.b, design.a, raw.motor_current);
-    std::cout << "  tau:         零相位滤波完成" << std::endl;
-
-    // ---- 5. 写入 CSV --------------------------------------------------------
-    std::cout << "\n写入输出 CSV..." << std::endl;
-    try {
-        signal_processing::writeFilteredCsv(cfg.output_csv, filtered);
-    } catch (const std::exception& e) {
-        std::cerr << "写入 CSV 失败: " << e.what() << std::endl;
-        return 1;
-    }
-    std::cout << "  → " << cfg.output_csv << std::endl;
-
-    // ---- 6. 总结 ------------------------------------------------------------
-    std::cout << "\n═══════════════════════════════════════════\n"
-              << "  处理完成\n"
-              << "  样本数: " << filtered.n_samples << "\n"
-              << "  自由度: " << filtered.n_dof << "\n"
-              << "  滤波器阶数: " << design.order << "\n"
-              << "  输出: " << cfg.output_csv << "\n"
-              << "═══════════════════════════════════════════\n"
-              << std::endl;
-
+    std::cout << "输出: " << output_csv << "\n完成\n" << std::endl;
     return 0;
 }
