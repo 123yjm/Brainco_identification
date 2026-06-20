@@ -53,3 +53,8 @@ target_link_libraries(brainco_id_filter PUBLIC Eigen3::Eigen ${YAML_CPP_LIBRARIE
 add_executable(filter_data main_filter.cpp)
 target_compile_definitions(filter_data PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(filter_data PRIVATE brainco_id_filter)
+
+# ---- 滤波 + 辨识一站式入口（无中间 CSV 落盘）----
+add_executable(filter_and_solve main_filter_and_solve.cpp)
+target_compile_definitions(filter_and_solve PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(filter_and_solve PRIVATE brainco_id_filter brainco_id_core)

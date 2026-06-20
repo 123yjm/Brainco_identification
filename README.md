@@ -1,10 +1,11 @@
 # Brainco Identification
 
-串联机械臂（7-DOF）动力学参数辨识工具链，包含三个独立可执行模块：
+串联机械臂（7-DOF）动力学参数辨识工具链，包含四个独立可执行模块：
 
 | 可执行文件 | 入口 | 功能 |
 |---|---|---|
 | `filter_data` | `main_filter.cpp` | 巴特沃斯低通滤波数据预处理 |
+| `filter_and_solve` | `main_filter_and_solve.cpp` | 滤波 + 辨识一站式管线（无中间 CSV） |
 | `get_traj` | `main_traj.cpp` | 傅里叶级数激励轨迹优化 |
 | `identify` | `main_solve.cpp` | 动力学参数辨识（6 种算法） |
 
@@ -75,7 +76,29 @@ python3 scripts/plot_filtered_data.py --input result/filtered_data.csv
 
 ---
 
-## 2. 激励轨迹优化器 — `get_traj`
+## 2. 滤波 + 辨识一站式管线 — `filter_and_solve`
+
+省去中间 CSV 文件，原始 `.txt` 读入后直接内存滤波 → 内存辨识 → 输出结果 `.yaml`。
+
+```
+用法: ./filter_and_solve [选项]
+
+选项:
+  --filter-config <yaml>  滤波配置 (默认: config/butterworth_filter.yaml)
+  --solve-config <yaml>   辨识配置 (默认: config/identification.yaml)
+  --passband <Hz>         覆盖通带频率
+  --stopband <Hz>         覆盖阻带频率
+  --algo <name>           覆盖辨识算法
+  --output <yaml>         覆盖结果输出路径
+  --no-damping            禁用阻尼项辨识
+  --help                  打印帮助信息
+```
+
+数据流: `.txt(43列)` → `filtfilt + 中心差分` → `ExperimentData` → `辨识算法` → `结果.yaml`
+
+---
+
+## 3. 激励轨迹优化器 — `get_traj`
 
 使用 5 阶傅里叶级数生成 D-optimal 激励轨迹，最大化观测矩阵的行列式以提高辨识精度。
 
@@ -95,7 +118,7 @@ python3 scripts/plot_filtered_data.py --input result/filtered_data.csv
 
 ---
 
-## 3. 动力学参数辨识器 — `identify`
+## 4. 动力学参数辨识器 — `identify`
 
 从滤波后的轨迹数据辨识串联机械臂的惯性参数和关节阻尼系数。
 

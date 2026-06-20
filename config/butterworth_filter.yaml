@@ -1,29 +1,95 @@
-# Butterworth Filter Configuration
-# ================================
-# 用于对原始激励轨迹采样数据进行低通滤波预处理。
-# 参数与 MATLAB 脚本 data/revoarm_filter.m 保持一致。
-
 io:
   # 输入：43 列无表头的逗号分隔 .txt 文件
   # 列序：t_abs, q(1-7), q_dot(1-7), motor_current(1-7), qd(1-7), qd_dot(1-7), qd_ddot(1-7)
   input_txt: data/revoarm_right_data_read_excitation_56.12_0618.txt
 
   # 输出：29 列带表头的 CSV 文件
-  # 列序：time, q0..q6, qd0..qd6, qdd0..qdd6, tau0..tau6
+  # 列序：time, q0..q6, qd0..qd6, qdd0..qd6, tau0..tau6
   output_csv: result/filtered_data.csv
 
 filter:
-  # 采样频率 (Hz)
+  # 采样频率 (Hz) — 由硬件决定，通常不需要调整
   sampling_frequency_hz: 100
 
-  # 通带频率 (Hz)
-  passband_hz: 2
+  # 通带截止频率 (Hz) — 【主要调参旋钮】
+  # 减小 → 更平滑但滞后更大、幅值衰减更多
+  # 增大 → 保真度高但抖动消除不足
+  passband_hz: 5
 
-  # 阻带频率 (Hz)
+  # 阻带起始频率 (Hz) — 【辅助调参旋钮】
+  # 靠近 passband_hz → 阶数升高，过渡带更陡
+  # 远离 passband_hz → 阶数降低，相位特性更好
   stopband_hz: 10
 
-  # 通带波纹 (dB)
-  passband_ripple_db: 1
+  # 通带最大波纹 (dB) — 影响滤波器阶数计算
+  passband_ripple_db: 3
 
-  # 阻带衰减 (dB)
-  stopband_attenuation_db: 50
+  # 阻带最小衰减 (dB) — 影响滤波器阶数计算
+  stopband_attenuation_db: 30
+
+
+
+
+
+# Butterworth Filter Configuration
+# ================================
+# 用于对原始激励轨迹采样数据进行低通滤波预处理。
+# 参数与 MATLAB 脚本 data/revoarm_filter.m 保持一致。
+#
+# ── 调参指南 ──────────────────────────────────────────────
+#
+# 【核心调参 knob：passband_hz（通带截止频率）】
+#
+#   passband_hz ↓ 减小  →  曲线更柔顺、ddq/tau 抖动更少
+#                        →  但相位滞后更大（信号延迟）、幅值衰减更多
+#
+#   passband_hz ↑ 增大  →  滞后小、幅值衰减少、信号保真度高
+#                        →  但滤波不足，ddq/tau 抖动残留更多
+#
+#   调参策略：从较大的 passband_hz 开始逐步减小，观察 ddq 和 tau
+#   曲线的平滑程度，在"抖动可接受"的前提下尽量取大值以减小滞后。
+#
+# 【辅助调参 knob：stopband_hz（阻带起始频率）】
+#
+#   stopband_hz 靠近 passband_hz → 过渡带窄 → 滤波器阶数自动升高
+#     → 阻带衰减更陡峭，但相位失真更大（非线性相位更明显）
+#   stopband_hz 远离 passband_hz → 过渡带宽 → 阶数降低
+#     → 相位特性更好（更线性），但高频噪声衰减变缓
+#
+#   经验法则：stopband_hz ≈ 1.5 ~ 2.0 × passband_hz 是合理起点。
+#
+# 【辅助调参 knob：passband_ripple_db / stopband_attenuation_db】
+#
+#   passband_ripple_db ↑ 增大  → 允许通带内更大波纹 → 阶数可能降低
+#   stopband_attenuation_db ↑ 增大 → 要求更强阻带衰减 → 阶数自动升高
+#
+#   这两个参数通过影响滤波器阶数 n 间接影响滤波效果：
+#     n = ceil( log10(es/ep) / log10(Ωs/Ωp) )
+#   阶数越高 → 过渡带越陡峭，但相位非线性越强（滞后越不均匀）
+#
+# 【sampling_frequency_hz】
+#   由硬件采样率决定，一般不需要调整。本项目中 fs = 100 Hz。
+#
+# ── 调参目标效果 ──────────────────────────────────────────
+#
+#   1. 尽量消除 ddq（加速度）曲线的抖动/毛刺
+#      - 加速度对位置信号的噪声极其敏感（二次差分放大高频噪声）
+#      - 滤波后 ddq 应呈现平滑的连续波形，不出现锯齿状高频振荡
+#
+#   2. 尽量消除 tau（力矩）曲线的抖动/毛刺
+#      - tau 由电机电流换算得到，电流信号含大量高频噪声
+#      - 滤波后 tau 应平滑，便于后续辨识算法稳定收敛
+#
+#   3. 尽量保持幅值不缩小太多
+#      - 滤波本质上会衰减高频成分，但信号的有效频率成分
+#        （激励轨迹的主要频率）应在通带内得到保留
+#      - 检查滤波前后 q 曲线的峰峰值：衰减通常应 < 5~10%
+#      - 若幅值衰减过大，说明 passband_hz 过低，需适当增大
+#
+#   4. 滞后（相位延迟）在可接受范围内
+#      - 低通滤波必然引入相位滞后，passband_hz 越低滞后越大
+#      - 对于离线辨识场景，只要输入/输出数据同步，恒定滞后可容忍
+#      - 可通过观察滤波前后曲线的时间偏移量来评估滞后程度
+#
+# ──────────────────────────────────────────────────────────
+

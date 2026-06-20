@@ -25,8 +25,8 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 # 默认输入路径（可直接修改）
 # ---------------------------------------------------------------------------
-DEFAULT_INPUT = "/home/ubuntu/Desktop/brainco_identification/result/filtered_data.csv"
-
+# DEFAULT_INPUT = "/home/ubuntu/Desktop/brainco_identification/result/filtered_data.csv"
+DEFAULT_INPUT = "/home/ubuntu/Desktop/brainco_identification/data/revoarm_filtered_data_condnum_56.12_0618.csv"
 # ---------------------------------------------------------------------------
 # 输出目录（相对于项目根目录，而非当前工作目录）
 # ---------------------------------------------------------------------------
