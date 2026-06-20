@@ -26,7 +26,5 @@ struct RigidBody {
   double Ixx = 0, Iyy = 0, Izz = 0;
   double Ixy = 0, Ixz = 0, Iyz = 0;
   Vector3d joint_axis{0, 0, 1};
-  double armature = 0.1;
-  double damping = 1.0;
   bool has_joint = false;
 };

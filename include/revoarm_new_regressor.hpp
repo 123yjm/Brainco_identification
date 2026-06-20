@@ -2,15 +2,13 @@
 
 #include "body2inertial.hpp"
 
+#include <string>
+#include <vector>
+
 namespace robot_dynamics {
 
 class RevoarmNewRegressor {
 public:
-  static constexpr std::size_t N_DOF = 7;
-  // 带质量用于辨识的 body: link1-7 = 7
-  // (link7 已合并 connector_link + hand_base_link 的质量和惯量)
-  static constexpr std::size_t N_BODIES = 7;
-
   using VectorXd = Eigen::VectorXd;
   using MatrixXd = Eigen::MatrixXd;
   using Matrix3d = Eigen::Matrix3d;
@@ -18,7 +16,14 @@ public:
   using Matrix4d = Eigen::Matrix4d;
   using Quaterniond = Eigen::Quaterniond;
 
-  RevoarmNewRegressor();
+  /// 从 YAML 配置文件构造（唯一入口）
+  explicit RevoarmNewRegressor(const std::string &yaml_path);
+
+  /// 自由度数
+  std::size_t nDof() const { return n_dof_; }
+
+  /// 用于辨识的刚体数量（不含 kinematic prefix）
+  std::size_t nBodies() const { return n_bodies_; }
 
   VectorXd
   computeParameterVector(ParamFlags flags = ParamFlags::ALL) const;
@@ -39,12 +44,16 @@ public:
   getParameterNames(ParamFlags flags = ParamFlags::ALL) const;
 
 private:
-  // 前方放 base_link + right_base_link (纯运动学, 不计入 N_BODIES)
-  // 索引: [0]=base_link, [1]=right_base_link, [2..8]=7 个 regressor body
-  std::array<RigidBody, N_BODIES + 2> bodies_;
+  std::size_t n_dof_ = 0;
+  std::size_t n_bodies_ = 0;
+  std::size_t kinematic_prefix_ = 0;
+
+  /// 全部刚体，索引 0..kinematic_prefix_-1 为纯运动学刚体，
+  /// kinematic_prefix_.. 为用于辨识的关节刚体
+  std::vector<RigidBody> bodies_;
   Vector3d gravity_{0, 0, -9.81};
 
-  void initBodies();
+  void loadFromYaml(const std::string &path);
 
   std::vector<Matrix4d> computeBodyTransforms(const VectorXd &q) const;
   Vector3d computeBodyCOM(std::size_t body_idx, const VectorXd &q) const;

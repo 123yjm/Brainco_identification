@@ -1,6 +1,7 @@
 # 无 ROS 参数辨识配置
 # robot 可选: panda / piper / revoarm_right / revoarm_new
 robot: "revoarm_new"
+kinematic_params: "config/kinematic_params.yaml"
 # algorithm: 0 表示跑完整基准；1-8 分别对应 OLS/WLS/IRLS/TLS/EKF/ML/CLOE/NLS_FRICTION
 algorithm: 0
 # regularization: 1 开启 Tikhonov 正则化 (默认), 0 关闭

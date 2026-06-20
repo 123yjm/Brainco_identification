@@ -1,142 +1,37 @@
 #include "revoarm_new_regressor.hpp"
+#include "robot_config_loader.hpp"
+
 #include <iostream>
 
 namespace robot_dynamics {
 
-// 前方 kinematic-only body 的数量 (base_link + right_base_link)
-static constexpr std::size_t KINEMATIC_PREFIX = 2;
-
 // ============================================================================
-// 构造函数
+// 构造函数 — 从 YAML 加载
 // ============================================================================
 
-RevoarmNewRegressor::RevoarmNewRegressor() { initBodies(); }
+RevoarmNewRegressor::RevoarmNewRegressor(const std::string &yaml_path) {
+  loadFromYaml(yaml_path);
+}
 
-void RevoarmNewRegressor::initBodies() {
-  // --- kinematic prefix: bodies_[0] = base_link ---
-  bodies_[0].name = "base_link";
-  bodies_[0].mass = 0;
-  bodies_[0].has_joint = false;
+void RevoarmNewRegressor::loadFromYaml(const std::string &path) {
+  RobotConfig cfg = loadKinematicConfig(path);
 
-  // --- kinematic prefix: bodies_[1] = right_base_link ---
-  bodies_[1].name = "right_base_link";
-  bodies_[1].pos = Vector3d(0.0055, -0.10424, -0.038037);
-  bodies_[1].quat = Quaterniond(0.996194825565, -0.0871542857135, 0.0, 0.0);
-  bodies_[1].mass = 0;
-  bodies_[1].has_joint = false;
+  n_dof_ = cfg.dof;
+  kinematic_prefix_ = cfg.kinematic_prefix;
 
-  // ========== 7 regressor bodies (indices 2..8) ==========
-
-  // --- regressor body 0: right_arm_link1 ---
-  bodies_[2].name = "right_arm_link1";
-  bodies_[2].mass = 0.99862;
-  bodies_[2].com = Vector3d(0.00138261246537, -0.0527123429468, -0.00121652148011);
-  bodies_[2].Ixx = 0.00134544913222;
-  bodies_[2].Iyy = 0.000834135586928;
-  bodies_[2].Izz = 0.00103343870055;
-  bodies_[2].Ixy = 9.35736730946e-06;
-  bodies_[2].Ixz = 3.47820470915e-07;
-  bodies_[2].Iyz = 4.90367363186e-05;
-  bodies_[2].joint_axis = Vector3d(0.0, 1.0, 0.0);
-  bodies_[2].damping = 0.179902637204222;
-  bodies_[2].has_joint = true;
-
-  // --- regressor body 1: right_arm_link2 ---
-  bodies_[3].name = "right_arm_link2";
-  bodies_[3].pos = Vector3d(0.0, -0.06, 0.0);
-  bodies_[3].quat = Quaterniond(0.996194825565, 0.0871542857135, 0.0, 0.0);
-  bodies_[3].mass = 0.1942;
-  bodies_[3].com = Vector3d(5.45283276618e-06, -0.000282431180944, -0.0268913421348);
-  bodies_[3].Ixx = 0.000382625514425;
-  bodies_[3].Iyy = 0.000369233743661;
-  bodies_[3].Izz = 0.000207280501913;
-  bodies_[3].Ixy = 9.48679552051e-07;
-  bodies_[3].Ixz = -2.1848535528e-06;
-  bodies_[3].Iyz = 2.31382379314e-06;
-  bodies_[3].joint_axis = Vector3d(-1.0, 0.0, 0.0);
-  bodies_[3].damping = 0.230292969031887;
-  bodies_[3].has_joint = true;
-
-  // --- regressor body 2: right_arm_link3 ---
-  bodies_[4].name = "right_arm_link3";
-  bodies_[4].pos = Vector3d(0.0, 0.0, -0.099);
-  bodies_[4].mass = 0.56897;
-  bodies_[4].com = Vector3d(-0.000454569614792, 3.12449787288e-05, -0.0666939671661);
-  bodies_[4].Ixx = 0.00134243655403;
-  bodies_[4].Iyy = 0.00131310898292;
-  bodies_[4].Izz = 0.000492154320293;
-  bodies_[4].Ixy = -1.10159695691e-06;
-  bodies_[4].Ixz = -8.9867271334e-06;
-  bodies_[4].Iyz = 1.87663764445e-06;
-  bodies_[4].joint_axis = Vector3d(0.0, 0.0, 1.0);
-  bodies_[4].damping = 0.216132996448927;
-  bodies_[4].has_joint = true;
-
-  // --- regressor body 3: right_arm_link4 ---
-  bodies_[5].name = "right_arm_link4";
-  bodies_[5].pos = Vector3d(0.0, 0.0, -0.121);
-  bodies_[5].mass = 0.43039;
-  bodies_[5].com = Vector3d(-7.58557077911e-06, 0.000351070451149, -0.0253844870788);
-  bodies_[5].Ixx = 0.00047306084261;
-  bodies_[5].Iyy = 0.00047377939084;
-  bodies_[5].Izz = 0.000275999880013;
-  bodies_[5].Ixy = 1.33236901297e-07;
-  bodies_[5].Ixz = -1.09059920161e-06;
-  bodies_[5].Iyz = -2.6711329621e-06;
-  bodies_[5].joint_axis = Vector3d(0.0, -1.0, 0.0);
-  bodies_[5].damping = 0.283625824431603;
-  bodies_[5].has_joint = true;
-
-  // --- regressor body 4: right_arm_link5 ---
-  bodies_[6].name = "right_arm_link5";
-  bodies_[6].pos = Vector3d(0.0, 0.0, -0.0635);
-  bodies_[6].mass = 0.80969;
-  bodies_[6].com = Vector3d(0.000915076828994, 1.83496866724e-05, -0.0751470282845);
-  bodies_[6].Ixx = 0.00182931151009;
-  bodies_[6].Iyy = 0.00183450989562;
-  bodies_[6].Izz = 0.00056086991064;
-  bodies_[6].Ixy = 9.37494132217e-07;
-  bodies_[6].Ixz = 3.67371332139e-05;
-  bodies_[6].Iyz = -1.6270176108e-06;
-  bodies_[6].joint_axis = Vector3d(0.0, 0.0, 1.0);
-  bodies_[6].damping = 0.0862977234677901;
-  bodies_[6].has_joint = true;
-
-  // --- regressor body 5: right_arm_link6 ---
-  bodies_[7].name = "right_arm_link6";
-  bodies_[7].pos = Vector3d(0.0, 0.0, -0.1525);
-  bodies_[7].mass = 0.31466;
-  bodies_[7].com = Vector3d(0.000179459444033, 0.00100056983205, -2.47524159457e-05);
-  bodies_[7].Ixx = 0.000120895453787;
-  bodies_[7].Iyy = 0.000136714381567;
-  bodies_[7].Izz = 0.000137495744014;
-  bodies_[7].Ixy = 2.38559203994e-07;
-  bodies_[7].Ixz = -7.17472862339e-08;
-  bodies_[7].Iyz = 2.58366532259e-07;
-  bodies_[7].joint_axis = Vector3d(1.0, 0.0, 0.0);
-  bodies_[7].damping = 0.211563663937835;
-  bodies_[7].has_joint = true;
-
-  // --- regressor body 6: right_arm_link7 ---
-  // (合并了 connector_link + hand_base_link 的质量和惯量)
-  bodies_[8].name = "right_arm_link7";
-  bodies_[8].quat = Quaterniond(0.999999529356, 0.000970199847794, 0.0, 0.0);
-  bodies_[8].mass = 0.73111;
-  bodies_[8].com = Vector3d(-0.000732931223882178, -0.00532077017212816, -0.0449146805909785);
-  bodies_[8].Ixx = 0.00125625176555862;
-  bodies_[8].Iyy = 0.00116418038751659;
-  bodies_[8].Izz = 0.000252744963516969;
-  bodies_[8].Ixy = 2.18319789240444e-05;
-  bodies_[8].Ixz = 8.15936869882136e-05;
-  bodies_[8].Iyz = 5.51214029071445e-05;
-  bodies_[8].joint_axis = Vector3d(0.0, -1.0, 0.0);
-  bodies_[8].damping = 0.300442759539957;
-  bodies_[8].has_joint = true;
-
-  // armature = 0 (MJCF 未指定)
-  for (std::size_t i = 0; i < KINEMATIC_PREFIX + N_BODIES; ++i) {
-    bodies_[i].armature = 0.0;
+  // 辨识刚体数量 = 总刚体 - kinematic prefix
+  if (cfg.bodies.size() <= kinematic_prefix_) {
+    throw std::runtime_error(
+        "bodies 数量 (" + std::to_string(cfg.bodies.size()) +
+        ") 不大于 kinematic_prefix (" + std::to_string(kinematic_prefix_) + ")");
   }
+  n_bodies_ = cfg.bodies.size() - kinematic_prefix_;
+
+  bodies_ = std::move(cfg.bodies);
+
+  std::cout << "[RevoarmNewRegressor] 从 " << path << " 加载, "
+            << n_dof_ << " DOF, " << n_bodies_ << " regressor bodies, "
+            << kinematic_prefix_ << " kinematic prefix" << std::endl;
 }
 
 // ============================================================================
@@ -165,7 +60,7 @@ RevoarmNewRegressor::poseToTransform(const Vector3d &pos,
 
 std::vector<RevoarmNewRegressor::Matrix4d>
 RevoarmNewRegressor::computeBodyTransforms(const VectorXd &q) const {
-  const std::size_t total = KINEMATIC_PREFIX + N_BODIES;
+  const std::size_t total = kinematic_prefix_ + n_bodies_;
   std::vector<Matrix4d> transforms(total);
 
   transforms[0] = poseToTransform(bodies_[0].pos, bodies_[0].quat);
@@ -176,7 +71,7 @@ RevoarmNewRegressor::computeBodyTransforms(const VectorXd &q) const {
     const auto &body = bodies_[i];
     Matrix4d T_parent_body = poseToTransform(body.pos, body.quat);
 
-    if (body.has_joint && joint_idx < N_DOF) {
+    if (body.has_joint && joint_idx < n_dof_) {
       double angle = q(joint_idx);
       Quaterniond joint_rot =
           Quaterniond(Eigen::AngleAxisd(angle, body.joint_axis));
@@ -204,11 +99,11 @@ RevoarmNewRegressor::computeBodyCOM(std::size_t body_idx,
 RevoarmNewRegressor::MatrixXd
 RevoarmNewRegressor::computeBodyOriginJacobian(
     std::size_t body_idx, const VectorXd &q) const {
-  MatrixXd J = MatrixXd::Zero(6, N_DOF);
+  MatrixXd J = MatrixXd::Zero(6, n_dof_);
   auto transforms = computeBodyTransforms(q);
   Vector3d p_origin = transforms[body_idx].block<3, 1>(0, 3);
 
-  const std::size_t total = KINEMATIC_PREFIX + N_BODIES;
+  const std::size_t total = kinematic_prefix_ + n_bodies_;
   std::size_t joint_count = 0;
   for (std::size_t i = 1; i <= body_idx && i < total; ++i) {
     if (bodies_[i].has_joint) {
@@ -226,11 +121,11 @@ RevoarmNewRegressor::computeBodyOriginJacobian(
 RevoarmNewRegressor::MatrixXd
 RevoarmNewRegressor::computeBodyJacobian(std::size_t body_idx,
                                                 const VectorXd &q) const {
-  MatrixXd J = MatrixXd::Zero(6, N_DOF);
+  MatrixXd J = MatrixXd::Zero(6, n_dof_);
   auto transforms = computeBodyTransforms(q);
   Vector3d p_body = computeBodyCOM(body_idx, q);
 
-  const std::size_t total = KINEMATIC_PREFIX + N_BODIES;
+  const std::size_t total = kinematic_prefix_ + n_bodies_;
   std::size_t joint_count = 0;
   for (std::size_t i = 1; i <= body_idx && i < total; ++i) {
     if (bodies_[i].has_joint) {
@@ -273,14 +168,10 @@ RevoarmNewRegressor::computeBodyJacobianDerivative(
 
 std::size_t
 RevoarmNewRegressor::numParameters(ParamFlags flags) const {
-  std::size_t params = N_BODIES * InertialParams::PARAMS_PER_BODY;
-
-  if (hasFlag(flags, ParamFlags::ARMATURE)) {
-    params += N_DOF;
-  }
+  std::size_t params = n_bodies_ * InertialParams::PARAMS_PER_BODY;
 
   if (hasFlag(flags, ParamFlags::DAMPING)) {
-    params += N_DOF;
+    params += n_dof_;
   }
 
   return params;
@@ -291,27 +182,17 @@ RevoarmNewRegressor::computeParameterVector(ParamFlags flags) const {
   const std::size_t num_params = numParameters(flags);
   VectorXd theta = VectorXd::Zero(num_params);
 
-  for (std::size_t i = 0; i < N_BODIES; ++i) {
-    std::size_t body_idx = i + KINEMATIC_PREFIX;
+  for (std::size_t i = 0; i < n_bodies_; ++i) {
+    std::size_t body_idx = i + kinematic_prefix_;
     auto sip = InertialParams::fromBody(bodies_[body_idx]);
     auto sip_vec = sip.toVector();
     std::size_t offset = i * InertialParams::PARAMS_PER_BODY;
     theta.segment(offset, InertialParams::PARAMS_PER_BODY) = sip_vec;
   }
 
-  std::size_t current_offset = N_BODIES * InertialParams::PARAMS_PER_BODY;
-
-  if (hasFlag(flags, ParamFlags::ARMATURE)) {
-    for (std::size_t i = 0; i < N_DOF; ++i) {
-      theta(current_offset + i) = bodies_[i + KINEMATIC_PREFIX].armature;
-    }
-    current_offset += N_DOF;
-  }
-
+  // damping 无物理先验，填 0
   if (hasFlag(flags, ParamFlags::DAMPING)) {
-    for (std::size_t i = 0; i < N_DOF; ++i) {
-      theta(current_offset + i) = bodies_[i + KINEMATIC_PREFIX].damping;
-    }
+    // theta 已初始化为零，无需额外操作
   }
 
   return theta;
@@ -321,26 +202,18 @@ std::vector<std::string>
 RevoarmNewRegressor::getParameterNames(ParamFlags flags) const {
   std::vector<std::string> names;
 
-  const char *body_names[] = {
-      "link1", "link2", "link3", "link4", "link5", "link6", "link7"};
-
   const char *param_names[] = {"m",   "mx",  "my",  "mz",  "Ixx",
                                "Ixy", "Ixz", "Iyy", "Iyz", "Izz"};
 
-  for (std::size_t i = 0; i < N_BODIES; ++i) {
+  for (std::size_t i = 0; i < n_bodies_; ++i) {
+    std::size_t body_idx = i + kinematic_prefix_;
     for (int j = 0; j < 10; ++j) {
-      names.push_back(std::string(body_names[i]) + "_" + param_names[j]);
-    }
-  }
-
-  if (hasFlag(flags, ParamFlags::ARMATURE)) {
-    for (std::size_t i = 0; i < N_DOF; ++i) {
-      names.push_back("armature_" + std::to_string(i + 1));
+      names.push_back(bodies_[body_idx].name + "_" + param_names[j]);
     }
   }
 
   if (hasFlag(flags, ParamFlags::DAMPING)) {
-    for (std::size_t i = 0; i < N_DOF; ++i) {
+    for (std::size_t i = 0; i < n_dof_; ++i) {
       names.push_back("damping_" + std::to_string(i + 1));
     }
   }
@@ -362,8 +235,8 @@ RevoarmNewRegressor::computeBodyRegressorBlock(
   Vector3d p_origin = transforms[body_idx].block<3, 1>(0, 3);
 
   // Body 原点的雅可比 (世界坐标系)
-  MatrixXd J_world = MatrixXd::Zero(6, N_DOF);
-  const std::size_t total = KINEMATIC_PREFIX + N_BODIES;
+  MatrixXd J_world = MatrixXd::Zero(6, n_dof_);
+  const std::size_t total = kinematic_prefix_ + n_bodies_;
   std::size_t joint_count = 0;
   for (std::size_t i = 1; i <= body_idx && i < total; ++i) {
     if (bodies_[i].has_joint) {
@@ -381,7 +254,7 @@ RevoarmNewRegressor::computeBodyRegressorBlock(
   auto transforms_plus = computeBodyTransforms(q_plus);
   Vector3d p_origin_plus = transforms_plus[body_idx].block<3, 1>(0, 3);
 
-  MatrixXd J_world_plus = MatrixXd::Zero(6, N_DOF);
+  MatrixXd J_world_plus = MatrixXd::Zero(6, n_dof_);
   joint_count = 0;
   for (std::size_t i = 1; i <= body_idx && i < total; ++i) {
     if (bodies_[i].has_joint) {
@@ -417,8 +290,8 @@ RevoarmNewRegressor::computeBodyRegressorBlock(
   Eigen::Matrix<double, 3, Eigen::Dynamic> Jv_local = Rt * Jv_world;
   Eigen::Matrix<double, 3, Eigen::Dynamic> Jw_local = Rt * Jw_world;
 
-  // 构建回归矩阵块 Y_body (N_DOF × 10)
-  MatrixXd Y_block = MatrixXd::Zero(N_DOF, 10);
+  // 构建回归矩阵块 Y_body (n_dof_ × 10)
+  MatrixXd Y_block = MatrixXd::Zero(n_dof_, 10);
 
   // K = [α]× + [ω]× * [ω]×
   Matrix3d alpha_skew = skew(alpha_local);
@@ -459,26 +332,18 @@ RevoarmNewRegressor::computeRegressorMatrix(
     ParamFlags flags) const {
 
   const std::size_t num_params = numParameters(flags);
-  MatrixXd Y = MatrixXd::Zero(N_DOF, num_params);
+  MatrixXd Y = MatrixXd::Zero(n_dof_, num_params);
 
-  for (std::size_t i = 0; i < N_BODIES; ++i) {
-    std::size_t body_idx = i + KINEMATIC_PREFIX;
+  for (std::size_t i = 0; i < n_bodies_; ++i) {
+    std::size_t body_idx = i + kinematic_prefix_;
     MatrixXd Y_body = computeBodyRegressorBlock(body_idx, q, qd, qdd);
     std::size_t offset = i * InertialParams::PARAMS_PER_BODY;
-    Y.block(0, offset, N_DOF, InertialParams::PARAMS_PER_BODY) = Y_body;
-  }
-
-  std::size_t current_offset = N_BODIES * InertialParams::PARAMS_PER_BODY;
-
-  if (hasFlag(flags, ParamFlags::ARMATURE)) {
-    for (std::size_t i = 0; i < N_DOF; ++i) {
-      Y(i, current_offset + i) = qdd(i);
-    }
-    current_offset += N_DOF;
+    Y.block(0, offset, n_dof_, InertialParams::PARAMS_PER_BODY) = Y_body;
   }
 
   if (hasFlag(flags, ParamFlags::DAMPING)) {
-    for (std::size_t i = 0; i < N_DOF; ++i) {
+    std::size_t current_offset = n_bodies_ * InertialParams::PARAMS_PER_BODY;
+    for (std::size_t i = 0; i < n_dof_; ++i) {
       Y(i, current_offset + i) = -qd(i);
     }
   }
@@ -493,7 +358,7 @@ RevoarmNewRegressor::computeObservationMatrix(
 
   const std::size_t K = Q.cols();
   const std::size_t num_params = numParameters(flags);
-  MatrixXd W = MatrixXd::Zero(N_DOF * K, num_params);
+  MatrixXd W = MatrixXd::Zero(n_dof_ * K, num_params);
 
 #ifdef IDENTIFICATION_USE_OPENMP
 #pragma omp parallel for schedule(static)
@@ -503,8 +368,8 @@ RevoarmNewRegressor::computeObservationMatrix(
     VectorXd qd = Qd.col(k);
     VectorXd qdd = Qdd.col(k);
     MatrixXd Y_k = computeRegressorMatrix(q, qd, qdd, flags);
-    W.block(k * static_cast<Eigen::Index>(N_DOF), 0,
-            static_cast<Eigen::Index>(N_DOF),
+    W.block(k * static_cast<Eigen::Index>(n_dof_), 0,
+            static_cast<Eigen::Index>(n_dof_),
             static_cast<Eigen::Index>(num_params)) = Y_k;
   }
 

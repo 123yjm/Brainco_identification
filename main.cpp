@@ -3,11 +3,12 @@
  * @brief brainco_identification — revoarm_new 线性回归辨识入口
  *
  * 读取 config/identification.yaml 获取配置，支持命令行参数覆盖。
+ * 机器人运动学参数从 kinematic_params.yaml 加载。
  * algorithm: 0=基准全部, 1=OLS, 2=WLS, 3=IRLS, 4=TLS, 5=EKF, 6=ML, 8=NLS_FRICTION
  *
  * 用法:
  *   ./identify [--config <yaml>] [--data <csv>] [--algo <name>] [--output <yaml>]
- *              [--no-armature] [--no-damping]
+ *              [--no-damping]
  */
 
 #include "data_loader.hpp"
@@ -31,8 +32,6 @@
 #include <vector>
 
 namespace {
-
-constexpr std::size_t DOF = 7;
 
 // ---------------------------------------------------------------------------
 // 算法编号 → 名称映射
@@ -109,10 +108,10 @@ struct Options {
   std::string config_file = "config/identification.yaml";
   std::string data_file;
   std::string output_file;
+  std::string kinematic_params;
   int algorithm = 0;       // 0=基准全部, 1-8 对应具体算法
   std::string algo_name;   // 命令行 --algo 覆盖（优先级最高）
   bool regularization = true;
-  bool armature = true;
   bool damping = true;
 };
 
@@ -130,10 +129,12 @@ Options loadConfig(int argc, char *argv[]) {
 
   // ---- 2. 读取配置文件 ----------------------------------------------------
   auto cfg = parseSimpleYaml(opt.config_file);
-  if (cfg.count("data_file"))   opt.data_file   = cfg["data_file"];
-  if (cfg.count("output_file")) opt.output_file = cfg["output_file"];
-  if (cfg.count("algorithm"))   opt.algorithm   = std::stoi(cfg["algorithm"]);
-  if (cfg.count("regularization")) opt.regularization = (std::stoi(cfg["regularization"]) != 0);
+  if (cfg.count("data_file"))       opt.data_file       = cfg["data_file"];
+  if (cfg.count("output_file"))     opt.output_file     = cfg["output_file"];
+  if (cfg.count("algorithm"))       opt.algorithm       = std::stoi(cfg["algorithm"]);
+  if (cfg.count("regularization"))  opt.regularization  = (std::stoi(cfg["regularization"]) != 0);
+  if (cfg.count("kinematic_params")) opt.kinematic_params = cfg["kinematic_params"];
+
   // 默认值
   if (opt.data_file.empty())
     opt.data_file = "data/revoarm_filtered_data_condnum_56.12_0618.csv";
@@ -150,15 +151,17 @@ Options loadConfig(int argc, char *argv[]) {
       opt.algo_name = argv[++i];
     else if (arg == "--output" && i + 1 < argc)
       opt.output_file = argv[++i];
-    else if (arg == "--no-armature")
-      opt.armature = false;
+    else if (arg == "--kinematic-params" && i + 1 < argc)
+      opt.kinematic_params = argv[++i];
     else if (arg == "--no-damping")
       opt.damping = false;
   }
 
   // 路径解析为绝对路径
-  opt.data_file   = resolvePath(opt.data_file);
-  opt.output_file = resolvePath(opt.output_file);
+  opt.data_file         = resolvePath(opt.data_file);
+  opt.output_file       = resolvePath(opt.output_file);
+  if (!opt.kinematic_params.empty())
+    opt.kinematic_params = resolvePath(opt.kinematic_params);
 
   return opt;
 }
@@ -218,8 +221,9 @@ SingleResult runSingle(const ExperimentData &data,
                        robot_dynamics::ParamFlags flags,
                        const std::string &algo_name, bool use_reg) {
   const std::size_t num_params = regressor.numParameters(flags);
+  const std::size_t dof = regressor.nDof();
   const Eigen::Index K = static_cast<Eigen::Index>(data.n_samples);
-  const Eigen::Index rows_per = static_cast<Eigen::Index>(DOF);
+  const Eigen::Index rows_per = static_cast<Eigen::Index>(dof);
 
   // 构建 W 和 tau_stacked
   Eigen::MatrixXd W_total =
@@ -237,7 +241,7 @@ SingleResult runSingle(const ExperimentData &data,
   }
 
   // 求解
-  auto solver = identification::createAlgorithm(algo_name, DOF);
+  auto solver = identification::createAlgorithm(algo_name, dof);
   if (!solver) {
     std::cerr << "跳过不支持的算法: " << algo_name << std::endl;
     return {algo_name, Eigen::VectorXd::Zero(num_params), 0.0, 0.0};
@@ -263,6 +267,16 @@ SingleResult runSingle(const ExperimentData &data,
 int main(int argc, char *argv[]) {
   Options opt = loadConfig(argc, argv);
 
+  // ---- 加载机器人模型 -----------------------------------------------------
+  if (opt.kinematic_params.empty()) {
+    std::cerr << "错误: 缺少必填配置项 kinematic_params (机器人运动学参数 YAML 路径)"
+              << std::endl;
+    return 1;
+  }
+  std::cout << "加载机器人模型: " << opt.kinematic_params << std::endl;
+  robot_dynamics::RevoarmNewRegressor regressor(opt.kinematic_params);
+  const std::size_t DOF = regressor.nDof();
+
   // ---- 加载数据 -----------------------------------------------------------
   std::cout << "加载数据: " << opt.data_file << std::endl;
   ExperimentData data;
@@ -276,14 +290,11 @@ int main(int argc, char *argv[]) {
 
   // ---- flags --------------------------------------------------------------
   auto flags = robot_dynamics::ParamFlags::NONE;
-  if (opt.armature) flags = flags | robot_dynamics::ParamFlags::ARMATURE;
   if (opt.damping)  flags = flags | robot_dynamics::ParamFlags::DAMPING;
 
-  robot_dynamics::RevoarmNewRegressor regressor;
   const std::size_t num_params = regressor.numParameters(flags);
   std::cout << "参数数: " << num_params
-            << "  (armature=" << (opt.armature ? "yes" : "no")
-            << ", damping=" << (opt.damping ? "yes" : "no")
+            << "  (damping=" << (opt.damping ? "yes" : "no")
             << ", regularization=" << (opt.regularization ? "yes" : "no") << ")"
             << std::endl;
 
