@@ -4,10 +4,10 @@
 
 | 可执行文件 | 入口 | 功能 |
 |---|---|---|
-| `filter_data` | `main_filter.cpp` | 巴特沃斯低通滤波数据预处理 |
-| `filter_and_solve` | `main_filter_and_solve.cpp` | 滤波 + 辨识一站式管线（无中间 CSV） |
-| `get_traj` | `main_traj.cpp` | 傅里叶级数激励轨迹优化 |
-| `identify` | `main_solve.cpp` | 动力学参数辨识（6 种算法） |
+| `filter_data` | `src/app/main_filter.cpp` | 巴特沃斯低通滤波数据预处理 |
+| `filter_and_solve` | `src/app/main_filter_and_solve.cpp` | 滤波 + 辨识一站式管线（无中间 CSV） |
+| `get_traj` | `src/app/main_traj.cpp` | 傅里叶级数激励轨迹优化 |
+| `identify` | `src/app/main_solve.cpp` | 动力学参数辨识（6 种算法） |
 
 ---
 

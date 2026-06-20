@@ -21,12 +21,12 @@ add_library(brainco_id_core
 target_include_directories(brainco_id_core PUBLIC include ${EIGEN3_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIR} ${NLOPT_INCLUDE_DIRS})
 target_link_libraries(brainco_id_core PUBLIC Eigen3::Eigen ${YAML_CPP_LIBRARIES} ${NLOPT_LIBRARIES})
 
-add_executable(identify main_solve.cpp)
+add_executable(identify src/app/main_solve.cpp)
 target_compile_definitions(identify PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(identify PRIVATE brainco_id_core)
 
 # ---- 激励轨迹优化（独立可执行文件）----
-add_executable(get_traj main_traj.cpp)
+add_executable(get_traj src/app/main_traj.cpp)
 target_compile_definitions(get_traj PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(get_traj PRIVATE brainco_id_core)
 
@@ -50,11 +50,11 @@ target_include_directories(brainco_id_filter PUBLIC include ${EIGEN3_INCLUDE_DIR
 target_link_libraries(brainco_id_filter PUBLIC Eigen3::Eigen ${YAML_CPP_LIBRARIES})
 
 # ---- 巴特沃斯滤波 CLI 入口（独立可执行文件）----
-add_executable(filter_data main_filter.cpp)
+add_executable(filter_data src/app/main_filter.cpp)
 target_compile_definitions(filter_data PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(filter_data PRIVATE brainco_id_filter)
 
 # ---- 滤波 + 辨识一站式入口（无中间 CSV 落盘）----
-add_executable(filter_and_solve main_filter_and_solve.cpp)
+add_executable(filter_and_solve src/app/main_filter_and_solve.cpp)
 target_compile_definitions(filter_and_solve PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(filter_and_solve PRIVATE brainco_id_filter brainco_id_core)
