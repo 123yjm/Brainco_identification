@@ -2,6 +2,9 @@
 
 #include "body2inertial.hpp"
 
+#include <pinocchio/multibody/model.hpp>
+#include <pinocchio/multibody/data.hpp>
+
 #include <string>
 #include <vector>
 
@@ -48,31 +51,30 @@ private:
   std::size_t n_bodies_ = 0;
   std::size_t kinematic_prefix_ = 0;
 
-  /// 全部刚体，索引 0..kinematic_prefix_-1 为纯运动学刚体，
-  /// kinematic_prefix_.. 为用于辨识的关节刚体
+  /// 全部刚体（从 YAML 加载的原始数据）
   std::vector<RigidBody> bodies_;
+
+  /// Pinocchio 模型与数据
+  pinocchio::Model pin_model_;
+  mutable pinocchio::Data pin_data_;
+
+  /// 辨识刚体对应的 Pinocchio joint 索引（长度为 n_bodies_）
+  std::vector<pinocchio::JointIndex> regressor_joint_ids_;
+
   Vector3d gravity_{0, 0, -9.81};
 
   void loadFromYaml(const std::string &path);
+  void buildPinocchioModel();
 
-  std::vector<Matrix4d> computeBodyTransforms(const VectorXd &q) const;
-  Vector3d computeBodyCOM(std::size_t body_idx, const VectorXd &q) const;
-  MatrixXd computeBodyOriginJacobian(std::size_t body_idx,
-                                     const VectorXd &q) const;
-  MatrixXd computeBodyOriginJacobianDerivative(std::size_t body_idx,
-                                               const VectorXd &q,
-                                               const VectorXd &qd) const;
-  MatrixXd computeBodyJacobian(std::size_t body_idx, const VectorXd &q) const;
-  MatrixXd computeBodyJacobianDerivative(std::size_t body_idx,
-                                         const VectorXd &q,
-                                         const VectorXd &qd) const;
-
-  static Matrix3d skew(const Vector3d &v);
-  static Matrix4d poseToTransform(const Vector3d &pos, const Quaterniond &quat);
-
-  MatrixXd computeBodyRegressorBlock(std::size_t body_idx, const VectorXd &q,
-                                     const VectorXd &qd,
-                                     const VectorXd &qdd) const;
+  /// 计算单个刚体的回归矩阵块，接收预先计算的运动学量
+  MatrixXd computeBodyRegressorBlock(
+      std::size_t body_idx,
+      const MatrixXd &J_origin,       // 6×n_dof body origin jacobian (WORLD frame)
+      const MatrixXd &J_origin_dot,   // 6×n_dof time derivative
+      const Matrix3d &R_body,         // body 世界旋转矩阵
+      const Vector3d &a_local,        // body origin 加速度 (local frame)
+      const Vector3d &omega_local,    // body 角速度 (local frame)
+      const Vector3d &alpha_local) const;  // body 角加速度 (local frame)
 };
 
 } // namespace robot_dynamics
