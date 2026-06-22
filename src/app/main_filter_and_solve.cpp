@@ -96,7 +96,8 @@ SingleResult runSingle(const ExperimentData& data,
 void saveResults(const std::string& path, const std::string& algo_name,
                  const Eigen::VectorXd& params,
                  double rmse, double max_error,
-                 const std::string& robot_name, bool append_mode = false) {
+                 const std::string& robot_name, bool append_mode,
+                 std::size_t n_bodies, std::size_t n_dof) {
     std::filesystem::path p(path);
     if (p.has_parent_path()) std::filesystem::create_directories(p.parent_path());
     auto mode = append_mode ? std::ios::app : std::ios::trunc;
@@ -114,9 +115,57 @@ void saveResults(const std::string& path, const std::string& algo_name,
     out << "  - algorithm: \"" << algo_name << "\"\n"
         << "    torque_rmse: " << rmse << "\n"
         << "    torque_max_error: " << max_error << "\n"
-        << "    parameters:\n";
-    for (Eigen::Index i = 0; i < params.size(); ++i)
-        out << "      - " << params(i) << "\n";
+        << "    parameters:\n"
+        << "        [\n";
+
+    // 分组：惯性 / armature / damping
+    Eigen::Index inertial_count = static_cast<Eigen::Index>(n_bodies * 10);
+    Eigen::Index n_dof_s = static_cast<Eigen::Index>(n_dof);
+    Eigen::Index total = params.size();
+    bool has_two_groups = (total - inertial_count) > n_dof_s;
+
+    // 惯性组（每行 10 个）
+    for (Eigen::Index i = 0; i < inertial_count; i += 10) {
+        out << "        ";
+        for (Eigen::Index j = 0; j < 10 && i + j < inertial_count; ++j) {
+            out << params(i + j);
+            if (i + j + 1 < total) out << ",";
+        }
+        out << "\n";
+    }
+
+    if (total > inertial_count) {
+        out << "\n";
+
+        if (has_two_groups) {
+            // armature 组
+            out << "        ";
+            Eigen::Index arm_start = inertial_count;
+            Eigen::Index arm_end = inertial_count + n_dof_s;
+            for (Eigen::Index j = arm_start; j < arm_end; ++j) {
+                out << params(j);
+                if (j + 1 < total) out << ",";
+            }
+            out << "\n\n";
+
+            // damping 组
+            out << "        ";
+            for (Eigen::Index j = arm_end; j < total; ++j) {
+                out << params(j);
+                if (j + 1 < total) out << ",";
+            }
+            out << "\n";
+        } else {
+            out << "        ";
+            for (Eigen::Index j = inertial_count; j < total; ++j) {
+                out << params(j);
+                if (j + 1 < total) out << ",";
+            }
+            out << "\n";
+        }
+    }
+
+    out << "        ]\n";
 }
 
 void printHelp(const char* prog) {
@@ -128,6 +177,7 @@ void printHelp(const char* prog) {
               << "  --stopband <Hz>     覆盖阻带频率\n"
               << "  --algo <name>       算法 (OLS/WLS/IRLS/TLS/EKF/NLS_FRICTION)\n"
               << "  --no-damping        禁用阻尼项辨识\n"
+              << "  --no-armature       禁用转子惯量项辨识\n"
               << "  --help              打印帮助信息\n";
 }
 
@@ -137,6 +187,9 @@ int main(int argc, char* argv[]) {
     std::string robot_dir;
     std::string algo_name;
     bool damping = true;
+    bool armature = true;
+    int algorithm = 3;
+    bool regularization = true;
     double passband_override = -1, stopband_override = -1;
 
     for (int i = 1; i < argc; ++i) {
@@ -147,6 +200,7 @@ int main(int argc, char* argv[]) {
         else if (arg == "--passband" && i + 1 < argc) passband_override = std::stod(argv[++i]);
         else if (arg == "--stopband" && i + 1 < argc) stopband_override = std::stod(argv[++i]);
         else if (arg == "--no-damping") damping = false;
+        else if (arg == "--no-armature") armature = false;
     }
 
     if (robot_dir.empty()) {
@@ -210,15 +264,35 @@ int main(int argc, char* argv[]) {
         if (kroot["robot_type"]) robot_type = kroot["robot_type"].as<std::string>();
     } catch (...) {}
 
+    // 从 identification.yaml 读取 armature / damping / algorithm 默认值
+    {
+        std::string id_yaml = robot_utils::configPath(robot_dir, "identification.yaml");
+        try {
+            auto iroot = YAML::LoadFile(id_yaml);
+            if (iroot["algorithm"])      algorithm      = iroot["algorithm"].as<int>();
+            if (iroot["regularization"]) regularization = (iroot["regularization"].as<int>() != 0);
+            if (iroot["armature"])       armature       = iroot["armature"].as<bool>();
+            if (iroot["damping"])        damping        = iroot["damping"].as<bool>();
+        } catch (...) {
+            // identification.yaml 不存在或损坏时使用默认值
+        }
+    }
+
     auto regressor = robot_dynamics::RegressorFactory::create(robot_type, kinematic_yaml);
     if (!regressor) { std::cerr << "无法创建回归器\n"; return 1; }
 
     auto flags = robot_dynamics::ParamFlags::NONE;
-    if (damping) flags = flags | robot_dynamics::ParamFlags::DAMPING;
+    if (armature) flags = flags | robot_dynamics::ParamFlags::ARMATURE;
+    if (damping)  flags = flags | robot_dynamics::ParamFlags::DAMPING;
 
     std::vector<std::string> algos;
     if (!algo_name.empty()) algos = {algo_name};
-    else algos = {"IRLS"};  // 默认
+    else if (algorithm == 0) algos = BENCHMARK_ALGOS;
+    else {
+        auto it = ALGO_MAP.find(algorithm);
+        if (it != ALGO_MAP.end()) algos = {it->second};
+        else algos = {"IRLS"};
+    }
 
     std::string output_yaml = robot_utils::resultPath(robot_dir,
         robot_name + "_identification.yaml");
@@ -231,10 +305,11 @@ int main(int argc, char* argv[]) {
     bool append = false;
     for (const auto& algo : algos) {
         std::cout << "\n--- " << algo << " ---" << std::endl;
-        auto r = runSingle(data, *regressor, flags, algo, true);
+        auto r = runSingle(data, *regressor, flags, algo, regularization);
         std::cout << algo << " => RMSE: " << r.rmse
                   << " Nm, Max Error: " << r.max_err << " Nm" << std::endl;
-        saveResults(output_yaml, algo, r.beta, r.rmse, r.max_err, robot_name, append);
+        saveResults(output_yaml, algo, r.beta, r.rmse, r.max_err, robot_name, append,
+                    regressor->nBodies(), regressor->nDof());
         append = true;
     }
 

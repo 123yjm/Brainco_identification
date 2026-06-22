@@ -1,0 +1,18 @@
+calibration_date: "2026-06-21 16:44:21"
+robot: "revoarm_right"
+evaluation_method: "torque_residual_rmse"
+benchmark_results:
+  - algorithm: "IRLS"
+    torque_rmse: 2.118537731302839e-01
+    torque_max_error: 1.221073468523175e+00
+    parameters:
+        [
+        1,2,3,4,5,6,7,8,9,10,
+        11,12,13,14,15,16,17,18,19,20,
+        ...(每十个数据换一次行)...   
+        61,62,63,64,65,66,67,68,69,70,
+        (惯性参数写完，换行x2)
+        71，72，73，74，75，76，77，
+        （amature写完，换行x2）
+        78，79，80，81，82，83，84
+        ]

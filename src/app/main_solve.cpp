@@ -47,6 +47,7 @@ struct SolveOptions {
     std::string algo_name;
     bool regularization = true;
     bool damping = true;
+    bool armature = true;
 };
 
 void printHelp(const char* prog) {
@@ -56,6 +57,7 @@ void printHelp(const char* prog) {
               << "  --robot <dir>       机器人目录 (如 robots/revoarm_right)\n"
               << "  --algo <name>       算法 (OLS/WLS/IRLS/TLS/EKF/NLS_FRICTION)\n"
               << "  --no-damping        禁用阻尼项辨识\n"
+              << "  --no-armature       禁用转子惯量项辨识\n"
               << "  --help              打印帮助信息\n";
 }
 
@@ -107,7 +109,8 @@ SingleResult runSingle(const ExperimentData& data,
 void saveResults(const std::string& path, const std::string& algo_name,
                  const Eigen::VectorXd& params,
                  double rmse, double max_error,
-                 const std::string& robot_name, bool append_mode = false) {
+                 const std::string& robot_name, bool append_mode,
+                 std::size_t n_bodies, std::size_t n_dof) {
     std::filesystem::path p(path);
     if (p.has_parent_path()) std::filesystem::create_directories(p.parent_path());
     auto mode = append_mode ? std::ios::app : std::ios::trunc;
@@ -125,23 +128,73 @@ void saveResults(const std::string& path, const std::string& algo_name,
     out << "  - algorithm: \"" << algo_name << "\"\n"
         << "    torque_rmse: " << rmse << "\n"
         << "    torque_max_error: " << max_error << "\n"
-        << "    parameters:\n";
-    for (Eigen::Index i = 0; i < params.size(); ++i)
-        out << "      - " << params(i) << "\n";
+        << "    parameters:\n"
+        << "        [\n";
+
+    // 分组：惯性 / armature / damping
+    Eigen::Index inertial_count = static_cast<Eigen::Index>(n_bodies * 10);
+    Eigen::Index n_dof_s = static_cast<Eigen::Index>(n_dof);
+    Eigen::Index total = params.size();
+    // remaining > n_dof → 同时有 armature 和 damping；否则只多一组
+    bool has_two_groups = (total - inertial_count) > n_dof_s;
+
+    // 惯性组（每行 10 个）
+    for (Eigen::Index i = 0; i < inertial_count; i += 10) {
+        out << "        ";
+        for (Eigen::Index j = 0; j < 10 && i + j < inertial_count; ++j) {
+            out << params(i + j);
+            if (i + j + 1 < total) out << ",";
+        }
+        out << "\n";
+    }
+
+    if (total > inertial_count) {
+        out << "\n";  // 惯性参数与下一组之间空行
+
+        if (has_two_groups) {
+            // armature 组
+            out << "        ";
+            Eigen::Index arm_start = inertial_count;
+            Eigen::Index arm_end = inertial_count + n_dof_s;
+            for (Eigen::Index j = arm_start; j < arm_end; ++j) {
+                out << params(j);
+                if (j + 1 < total) out << ",";
+            }
+            out << "\n\n";  // armature 与 damping 之间空行
+
+            // damping 组
+            out << "        ";
+            for (Eigen::Index j = arm_end; j < total; ++j) {
+                out << params(j);
+                if (j + 1 < total) out << ",";
+            }
+            out << "\n";
+        } else {
+            // 仅 armature 或仅 damping
+            out << "        ";
+            for (Eigen::Index j = inertial_count; j < total; ++j) {
+                out << params(j);
+                if (j + 1 < total) out << ",";
+            }
+            out << "\n";
+        }
+    }
+
+    out << "        ]\n";
 }
 
 }  // anonymous namespace
 
 int main(int argc, char* argv[]) {
-    // ---- 解析 CLI ---------------------------------------------------------
+    // ---- 第一次扫描：仅解析 --robot / --help --------------------------------
     SolveOptions opt;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--help") { printHelp(argv[0]); return 0; }
-        else if ((arg == "--robot" || arg == "-r") && i + 1 < argc) opt.robot_dir = robot_utils::resolvePath(robot_utils::resolveRobotDir(argv[++i]), PROJECT_ROOT_DIR);
-        else if (arg == "--algo" && i + 1 < argc) opt.algo_name = argv[++i];
-        else if (arg == "--no-damping") opt.damping = false;
+        else if ((arg == "--robot" || arg == "-r") && i + 1 < argc)
+            opt.robot_dir = robot_utils::resolvePath(
+                robot_utils::resolveRobotDir(argv[++i]), PROJECT_ROOT_DIR);
     }
 
     if (opt.robot_dir.empty()) {
@@ -160,6 +213,28 @@ int main(int argc, char* argv[]) {
         auto kroot = YAML::LoadFile(opt.kinematic_params);
         if (kroot["robot_type"]) robot_type = kroot["robot_type"].as<std::string>();
     } catch (...) {}
+
+    // 从 identification.yaml 读取 armature / damping / algorithm 默认值
+    {
+        std::string id_yaml = robot_utils::configPath(opt.robot_dir, "identification.yaml");
+        try {
+            auto iroot = YAML::LoadFile(id_yaml);
+            if (iroot["algorithm"])      opt.algorithm      = iroot["algorithm"].as<int>();
+            if (iroot["regularization"]) opt.regularization = (iroot["regularization"].as<int>() != 0);
+            if (iroot["armature"])       opt.armature       = iroot["armature"].as<bool>();
+            if (iroot["damping"])        opt.damping        = iroot["damping"].as<bool>();
+        } catch (...) {
+            // identification.yaml 不存在或损坏时使用默认值
+        }
+    }
+
+    // ---- 第二次扫描：CLI 覆盖（优先级高于 YAML）----------------------------
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--algo" && i + 1 < argc) opt.algo_name = argv[++i];
+        else if (arg == "--no-damping") opt.damping = false;
+        else if (arg == "--no-armature") opt.armature = false;
+    }
 
     // ---- 加载机器人模型 ---------------------------------------------------
     std::cout << "机器人: " << opt.robot_name << " (type: " << robot_type << ")"
@@ -185,7 +260,8 @@ int main(int argc, char* argv[]) {
 
     // ---- flags ------------------------------------------------------------
     auto flags = robot_dynamics::ParamFlags::NONE;
-    if (opt.damping) flags = flags | robot_dynamics::ParamFlags::DAMPING;
+    if (opt.armature) flags = flags | robot_dynamics::ParamFlags::ARMATURE;
+    if (opt.damping)  flags = flags | robot_dynamics::ParamFlags::DAMPING;
 
     // ---- 运行 -------------------------------------------------------------
     std::vector<std::string> algos;
@@ -201,6 +277,7 @@ int main(int argc, char* argv[]) {
     for (auto& a : algos) std::cout << a << " ";
     std::cout << "\nDOF: " << regressor->nDof()
               << ", 参数数: " << regressor->numParameters(flags)
+              << ", armature=" << (opt.armature ? "yes" : "no")
               << ", damping=" << (opt.damping ? "yes" : "no") << std::endl;
 
     bool append = false;
@@ -209,7 +286,8 @@ int main(int argc, char* argv[]) {
         auto r = runSingle(data, *regressor, flags, algo, opt.regularization);
         std::cout << algo << " => RMSE: " << r.rmse
                   << " Nm, Max Error: " << r.max_err << " Nm" << std::endl;
-        saveResults(opt.output_file, algo, r.beta, r.rmse, r.max_err, opt.robot_name, append);
+        saveResults(opt.output_file, algo, r.beta, r.rmse, r.max_err, opt.robot_name, append,
+                    regressor->nBodies(), regressor->nDof());
         append = true;
     }
 
