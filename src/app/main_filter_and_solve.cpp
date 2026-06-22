@@ -142,7 +142,7 @@ int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--help") { printHelp(argv[0]); return 0; }
-        else if (arg == "--robot" && i + 1 < argc) robot_dir = argv[++i];
+        else if ((arg == "--robot" || arg == "-r") && i + 1 < argc) robot_dir = robot_utils::resolvePath(robot_utils::resolveRobotDir(argv[++i]), PROJECT_ROOT_DIR);
         else if (arg == "--algo" && i + 1 < argc) algo_name = argv[++i];
         else if (arg == "--passband" && i + 1 < argc) passband_override = std::stod(argv[++i]);
         else if (arg == "--stopband" && i + 1 < argc) stopband_override = std::stod(argv[++i]);
@@ -188,10 +188,16 @@ int main(int argc, char* argv[]) {
     filtered.time.resize(raw.n_samples);
     double t0 = raw.t_abs[0];
     for (int i = 0; i < raw.n_samples; ++i) filtered.time[i] = raw.t_abs[i] - t0;
-    filtered.q_filtered      = raw.q;
-    filtered.q_dot_filtered  = signal_processing::filtfilt(design.b, design.a, raw.q_dot);
+    filtered.q_filtered = raw.q;
+
+    if (filter_cfg.turn_on_filter) {
+        filtered.q_dot_filtered  = signal_processing::filtfilt(design.b, design.a, raw.q_dot);
+        filtered.tau_filtered    = signal_processing::filtfilt(design.b, design.a, raw.motor_current);
+    } else {
+        filtered.q_dot_filtered  = raw.q_dot;
+        filtered.tau_filtered    = raw.motor_current;
+    }
     filtered.q_ddot_filtered = signal_processing::centralDifference(filtered.q_dot_filtered, 1.0/fs);
-    filtered.tau_filtered    = signal_processing::filtfilt(design.b, design.a, raw.motor_current);
     std::cout << "滤波完成, 样本: " << filtered.n_samples << std::endl;
 
     // ---- 2. 辨识 ----------------------------------------------------------

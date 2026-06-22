@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--help") { printHelp(argv[0]); return 0; }
-        else if (arg == "--robot" && i + 1 < argc) robot_dir = argv[++i];
+        else if ((arg == "--robot" || arg == "-r") && i + 1 < argc) robot_dir = robot_utils::resolvePath(robot_utils::resolveRobotDir(argv[++i]), PROJECT_ROOT_DIR);
     }
 
     if (robot_dir.empty()) {

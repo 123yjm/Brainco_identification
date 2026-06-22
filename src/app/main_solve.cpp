@@ -139,7 +139,7 @@ int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--help") { printHelp(argv[0]); return 0; }
-        else if (arg == "--robot" && i + 1 < argc) opt.robot_dir = argv[++i];
+        else if ((arg == "--robot" || arg == "-r") && i + 1 < argc) opt.robot_dir = robot_utils::resolvePath(robot_utils::resolveRobotDir(argv[++i]), PROJECT_ROOT_DIR);
         else if (arg == "--algo" && i + 1 < argc) opt.algo_name = argv[++i];
         else if (arg == "--no-damping") opt.damping = false;
     }

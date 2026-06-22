@@ -38,6 +38,9 @@ FilterConfig loadFilterConfig(const std::string& yaml_path) {
     // --- filter section ---
     if (root["filter"]) {
         auto flt = root["filter"];
+        if (flt["turn_on_filter"]) {
+            cfg.turn_on_filter = flt["turn_on_filter"].as<bool>();
+        }
         if (flt["sampling_frequency_hz"]) {
             cfg.fs = flt["sampling_frequency_hz"].as<double>();
         }
@@ -173,12 +176,20 @@ void writeFilteredCsv(const std::string& filepath,
 
     file << std::fixed << std::setprecision(6);
 
+    bool has_raw = (data.q_dot_raw.rows() > 0);
+
     // --- Header ---
     file << "time";
     for (int j = 0; j < data.n_dof; ++j) file << ",q" << j;
     for (int j = 0; j < data.n_dof; ++j) file << ",qd" << j;
     for (int j = 0; j < data.n_dof; ++j) file << ",qdd" << j;
     for (int j = 0; j < data.n_dof; ++j) file << ",tau" << j;
+    if (has_raw) {
+        for (int j = 0; j < data.n_dof; ++j) file << ",q_raw" << j;
+        for (int j = 0; j < data.n_dof; ++j) file << ",qd_raw" << j;
+        for (int j = 0; j < data.n_dof; ++j) file << ",qdd_raw" << j;
+        for (int j = 0; j < data.n_dof; ++j) file << ",tau_raw" << j;
+    }
     file << "\n";
 
     // --- Data rows ---
@@ -188,6 +199,12 @@ void writeFilteredCsv(const std::string& filepath,
         for (int j = 0; j < data.n_dof; ++j) file << "," << data.q_dot_filtered(i, j);
         for (int j = 0; j < data.n_dof; ++j) file << "," << data.q_ddot_filtered(i, j);
         for (int j = 0; j < data.n_dof; ++j) file << "," << data.tau_filtered(i, j);
+        if (has_raw) {
+            for (int j = 0; j < data.n_dof; ++j) file << "," << data.q_filtered(i, j);    // q_raw = q (unfiltered)
+            for (int j = 0; j < data.n_dof; ++j) file << "," << data.q_dot_raw(i, j);
+            for (int j = 0; j < data.n_dof; ++j) file << "," << data.q_ddot_raw(i, j);
+            for (int j = 0; j < data.n_dof; ++j) file << "," << data.tau_raw(i, j);
+        }
         file << "\n";
     }
 

@@ -9,6 +9,7 @@ namespace signal_processing {
 /// Filter parameters loaded from butterworth_filter.yaml.
 /// I/O paths are auto-derived from the robot directory by entry points.
 struct FilterConfig {
+    bool turn_on_filter = true;
     double fs = 100.0;
     double passband_hz = 5.0;
     double stopband_hz = 10.0;
@@ -36,6 +37,12 @@ struct FilteredOutputData {
     Eigen::MatrixXd q_dot_filtered;    ///< filtfilt on q_dot (N x 7) [rad/s]
     Eigen::MatrixXd q_ddot_filtered;   ///< Central diff on q_dot_filtered (N x 7) [rad/s²]
     Eigen::MatrixXd tau_filtered;      ///< filtfilt on motor_current (N x 7)
+
+    // ---- 滤波前原始数据（用于 CSV 对比滤波效果）----
+    Eigen::MatrixXd q_dot_raw;         ///< Raw q_dot before filtering (N x 7)
+    Eigen::MatrixXd q_ddot_raw;        ///< Central diff on raw q_dot (N x 7)
+    Eigen::MatrixXd tau_raw;           ///< Raw motor_current before filtering (N x 7)
+
     int n_samples = 0;
     int n_dof = 7;
 };

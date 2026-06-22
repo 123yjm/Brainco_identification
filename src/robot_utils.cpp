@@ -50,4 +50,9 @@ std::string findFirstFile(const std::string& directory, const std::string& glob)
     return {};
 }
 
+std::string resolveRobotDir(const std::string& arg) {
+    if (arg.find('/') != std::string::npos) return arg;
+    return "robots/" + arg;
+}
+
 }  // namespace robot_utils

@@ -1,0 +1,5 @@
+# Identification Configuration — revoarm_right
+# robot / kinematic_params / data_file / output_file 由入口函数自动推导。
+
+algorithm: 1
+regularization: 1

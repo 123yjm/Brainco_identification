@@ -20,13 +20,15 @@ ExperimentData DataLoader::loadCSV(const std::string &filename,
   // Detect if qdd columns exist by checking header or column count
   // Format with qdd: time, q0..qN, qd0..qdN, qdd0..qddN, tau0..tauN
   // Format without qdd: time, q0..qN, qd0..qdN, tau0..tauN
-  const std::size_t cols_with_qdd = 1 + 4 * n_dof;
-  const std::size_t cols_without_qdd = 1 + 3 * n_dof;
+  const std::size_t cols_with_qdd    = 1 + 4 * n_dof;   // 29 (filtered only)
+  const std::size_t cols_without_qdd = 1 + 3 * n_dof;   // 22
+  const std::size_t cols_with_raw    = 1 + 8 * n_dof;   // 57 (filtered + raw)
 
   std::vector<double> time_vec;
   std::vector<std::vector<double>> q_vec, qd_vec, qdd_vec, tau_vec;
   bool has_qdd = false;
   bool format_detected = false;
+  std::size_t expected_cols = 0;
 
   while (std::getline(file, line)) {
     std::stringstream ss(line);
@@ -39,21 +41,23 @@ ExperimentData DataLoader::loadCSV(const std::string &filename,
 
     // Detect format on first data row
     if (!format_detected) {
-      if (row.size() == cols_with_qdd) {
+      if (row.size() == cols_with_qdd || row.size() >= cols_with_raw) {
         has_qdd = true;
+        expected_cols = row.size();  // 允许 >= 29 的列数，后续行与此一致即可
       } else if (row.size() == cols_without_qdd) {
         has_qdd = false;
+        expected_cols = cols_without_qdd;
       } else {
         throw std::runtime_error("CSV 列数与配置的机械臂自由度不匹配: " +
                                  std::to_string(row.size()) + " 列, 期望 " +
-                                 std::to_string(cols_with_qdd) + " 或 " +
-                                 std::to_string(cols_without_qdd) + " 列");
+                                 std::to_string(cols_with_qdd) + "、" +
+                                 std::to_string(cols_without_qdd) + " 或 " +
+                                 std::to_string(cols_with_raw) + " 列");
       }
       format_detected = true;
     }
 
-    // Validate row size
-    const std::size_t expected_cols = has_qdd ? cols_with_qdd : cols_without_qdd;
+    // Validate row size consistency
     if (row.size() != expected_cols) {
       throw std::runtime_error("CSV 数据行列数不一致: 实际 " +
                                std::to_string(row.size()) + " 列, 期望 " +
