@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-csv_traj2txt.py — 将 get_traj 生成的激励轨迹 CSV 转换为硬件控制所需 TXT 格式。
+csv_traj2txt.py — 将 get_excite_traj 生成的激励轨迹 CSV 转换为硬件控制所需 TXT 格式。
 
-输入 CSV 格式 (get_traj 输出):
+输入 CSV 格式 (get_excite_traj 输出):
   表头 + 101 行 × 29 列
   列: time, q0..q6, qd0..qd6, qdd0..qdd6, tau0..tau6
   采样: dt=0.1s, 单周期 T=10s
@@ -23,8 +23,8 @@ import os
 # ---------------------------------------------------------------------------
 # 参数
 # ---------------------------------------------------------------------------
-CSV_PATH = os.path.join(os.path.dirname(__file__), "excitation_trajectory.csv")
-TXT_PATH = os.path.join(os.path.dirname(__file__), "excitation_trajectory.txt")
+CSV_PATH = "/home/ubuntu/Desktop/brainco_identification/robots/single_right/result/single_right_excitation_trajectory.csv"
+TXT_PATH = "/home/ubuntu/Desktop/brainco_identification/robots/single_right/result/single_right_excitation_trajectory.txt"
 
 DOF = 7
 SAMPLING_TIME = 10.0    # 激励轨迹运行时长 (s)
@@ -55,7 +55,7 @@ def load_csv(path):
     return t_in, q_in, qd_in, qdd_in
 
 # ---------------------------------------------------------------------------
-# 三周期重复 (CSV 已由 get_traj 以 trajectory_frequency 输出，无需插值)
+# 三周期重复 (CSV 已由 get_excite_traj 以 trajectory_frequency 输出，无需插值)
 # ---------------------------------------------------------------------------
 def repeat_periods(y_one, n_periods):
     """repmat 风格重复 n_periods 个周期（不移除周期边界重叠点）。"""
@@ -116,7 +116,7 @@ if __name__ == '__main__':
     # 1. 读取
     t_in, q_in, qd_in, qdd_in = load_csv(csv_path)
 
-    # 2. 三周期重复 (CSV 已由 get_traj 以 trajectory_frequency 输出，直接 repmat)
+    # 2. 三周期重复 (CSV 已由 get_excite_traj 以 trajectory_frequency 输出，直接 repmat)
     print(f"\n重复 {NUM_PERIODS} 周期 ({len(t_in)} 点/周期)...")
     q_out   = repeat_periods(q_in,   NUM_PERIODS)
     qd_out  = repeat_periods(qd_in,  NUM_PERIODS)

@@ -27,9 +27,19 @@ target_compile_definitions(identify PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR
 target_link_libraries(identify PRIVATE brainco_id_core)
 
 # ---- 激励轨迹优化（独立可执行文件）----
-add_executable(get_traj src/app/main_traj.cpp)
-target_compile_definitions(get_traj PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
-target_link_libraries(get_traj PRIVATE brainco_id_core)
+add_executable(get_excite_traj src/app/main_get_excite_traj.cpp)
+target_compile_definitions(get_excite_traj PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(get_excite_traj PRIVATE brainco_id_core)
+
+# ---- 摩擦力辨识轨迹生成 ----
+add_executable(get_friction_traj src/app/main_get_friction_traj.cpp)
+target_compile_definitions(get_friction_traj PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(get_friction_traj PRIVATE brainco_id_core)
+
+# ---- 观测矩阵秩分析 ----
+add_executable(calc_rank src/app/main_calc_rank.cpp)
+target_compile_definitions(calc_rank PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(calc_rank PRIVATE brainco_id_core)
 
 # ---- Qt 上位机（独立可执行文件，与辨识核心解耦）----
 find_package(Qt5Widgets REQUIRED)

@@ -6,7 +6,7 @@
 |---|---|---|
 | `filter_data` | `src/app/main_filter.cpp` | 巴特沃斯低通滤波数据预处理 |
 | `filter_and_solve` | `src/app/main_filter_and_solve.cpp` | 滤波 + 辨识一站式管线（无中间 CSV） |
-| `get_traj` | `src/app/main_traj.cpp` | 傅里叶级数激励轨迹优化 |
+| `get_excite_traj` | `src/app/main_get_excite_traj.cpp` | 傅里叶级数激励轨迹优化 |
 | `identify` | `src/app/main_solve.cpp` | 动力学参数辨识（6 种算法） |
 
 ---
@@ -28,7 +28,7 @@ sudo apt install libeigen3-dev libyaml-cpp-dev libnlopt-cxx-dev
 ```bash
 ./filter_data        --robot robots/revoarm_right
 ./filter_and_solve   --robot robots/revoarm_right
-./get_traj           --robot robots/revoarm_right
+./get_excite_traj    --robot robots/revoarm_right
 ./identify           --robot robots/revoarm_right
 ```
 
@@ -82,10 +82,10 @@ python3 scripts/plot_filtered_data.py --input robots/revoarm_right/result/revoar
 
 ---
 
-## 3. 激励轨迹优化器 — `get_traj`
+## 3. 激励轨迹优化器 — `get_excite_traj`
 
 ```bash
-./get_traj --robot robots/revoarm_right
+./get_excite_traj --robot robots/revoarm_right
 ```
 
 输出: `result/<robot>_excitation_trajectory.csv`

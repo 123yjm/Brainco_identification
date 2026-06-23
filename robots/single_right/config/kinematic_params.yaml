@@ -1,0 +1,65 @@
+robot_type: "serial_arm"
+dof: 7
+kinematic_prefix: 2
+
+bodies:
+  # ========== kinematic prefix ==========
+  - name: "base_link"
+    has_joint: false
+
+  - name: "right_base_link"
+    pos: [0.0, 0.0, 0.0997]
+    quat: [0.707105482511, -0.707108079859, 0.0, 0.0]
+    has_joint: false
+
+  # ========== regressor body 0: right_arm_link1 ==========
+  - name: "right_arm_link1"
+    quat: [0.707105482511, 0.0, 0.707108079859, 0.0]
+    mass: 0.99862
+    joint_axis: [0.0, 1.0, 0.0]
+    has_joint: true
+
+  # ========== regressor body 1: right_arm_link2 ==========
+  - name: "right_arm_link2"
+    pos: [0.0, -0.06, 0.0]
+    quat: [0.707105482511, -0.707108079859, 0.0, 0.0]
+    mass: 0.1942
+    joint_axis: [-1.0, 0.0, 0.0]
+    has_joint: true
+
+  # ========== regressor body 2: right_arm_link3 ==========
+  - name: "right_arm_link3"
+    pos: [0.0, 0.0, -0.099]
+    quat: [0.707105482511, 0.0, 0.0, 0.707108079859]
+    mass: 0.56897
+    joint_axis: [0.0, 0.0, 1.0]
+    has_joint: true
+
+  # ========== regressor body 3: right_arm_link4 ==========
+  - name: "right_arm_link4"
+    pos: [0.0, 0.0, -0.121]
+    mass: 0.43039
+    joint_axis: [0.0, -1.0, 0.0]
+    has_joint: true
+
+  # ========== regressor body 4: right_arm_link5 ==========
+  - name: "right_arm_link5"
+    pos: [0.0, 0.0, -0.0635]
+    mass: 0.80969
+    joint_axis: [0.0, 0.0, 1.0]
+    has_joint: true
+
+  # ========== regressor body 5: right_arm_link6 ==========
+  - name: "right_arm_link6"
+    pos: [0.0, 0.0, -0.1525]
+    mass: 0.31466
+    joint_axis: [1.0, 0.0, 0.0]
+    has_joint: true
+
+  # ========== regressor body 6: right_arm_link7 ==========
+  # (合并了 connector_link + hand_base_link 的质量和惯量)
+  - name: "right_arm_link7"
+    quat: [0.999999529356, 0.000970199847794, 0.0, 0.0]
+    mass: 0.73111
+    joint_axis: [0.0, -1.0, 0.0]
+    has_joint: true

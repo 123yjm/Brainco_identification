@@ -1,0 +1,17 @@
+# Identification Configuration — revoarm_right
+# robot / kinematic_params / data_file / output_file 由入口函数自动推导。
+#
+# 算法编号 (algorithm):
+#   1 = OLS  普通最小二乘
+#   2 = WLS  加权最小二乘
+#   3 = IRLS 迭代重加权最小二乘
+#   4 = TLS  整体最小二乘
+#   5 = EKF  扩展卡尔曼滤波
+#   8 = NLS_FRICTION 非线性摩擦辨识
+#   0 = 运行全部算法 (benchmark)
+# regularization: 1=开启 Tikhonov 正则化, 0=关闭
+
+algorithm: 1
+regularization: 1
+armature: true
+damping: true
