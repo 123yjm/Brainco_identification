@@ -128,6 +128,6 @@ if __name__ == "__main__":
     else:
         # 如果不传参数，可以在这里手动指定文件名
         # filename = "/home/xyd/BrainCo/revoarm_developing/revoarm_teleoperation/hardware_control_debug/logs/recorded_trajectory_20260314_163353.txt"  # ← 修改成你的实际文件名
-        filename = "/home/ubuntu/Desktop/brainco_identification/robots/single_right/data/single_right_excitation_trajectory_20260623_141852.txt"
+        filename = "/home/ubuntu/Desktop/brainco_identification/robots/single_right/data_inertia/single_right_excitation_trajectory_20260623_141852.txt"
     print(f"正在读取文件: {filename}")
     plot_trajectory(filename)

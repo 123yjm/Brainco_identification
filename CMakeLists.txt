@@ -22,9 +22,19 @@ add_library(brainco_id_core
 target_include_directories(brainco_id_core PUBLIC include ${EIGEN3_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIR} ${NLOPT_INCLUDE_DIRS})
 target_link_libraries(brainco_id_core PUBLIC Eigen3::Eigen ${YAML_CPP_LIBRARIES} ${NLOPT_LIBRARIES})
 
-add_executable(identify src/app/main_solve.cpp)
-target_compile_definitions(identify PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
-target_link_libraries(identify PRIVATE brainco_id_core)
+add_executable(identify_inertia src/app/main_solve_inertia.cpp)
+target_compile_definitions(identify_inertia PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(identify_inertia PRIVATE brainco_id_core)
+
+# ---- 重力分离 ----
+add_executable(remove_gravity src/app/main_remove_gravity.cpp)
+target_compile_definitions(remove_gravity PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(remove_gravity PRIVATE brainco_id_core)
+
+# ---- 摩擦力辨识 ----
+add_executable(identify_friction src/app/main_solve_friction.cpp)
+target_compile_definitions(identify_friction PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(identify_friction PRIVATE brainco_id_core)
 
 # ---- 激励轨迹优化（独立可执行文件）----
 add_executable(get_excite_traj src/app/main_get_excite_traj.cpp)

@@ -217,7 +217,7 @@ int main(int argc, char* argv[]) {
     if (stopband_override > 0) filter_cfg.stopband_hz = stopband_override;
 
     std::string input_txt = robot_utils::findFirstFile(
-        robot_utils::dataPath(robot_dir, ""), "*.txt");
+        robot_utils::dataInertiaPath(robot_dir, ""), "*.txt");
     if (input_txt.empty()) {
         std::cerr << "错误: 未找到 .txt 文件\n"; return 1;
     }
@@ -264,9 +264,9 @@ int main(int argc, char* argv[]) {
         if (kroot["robot_type"]) robot_type = kroot["robot_type"].as<std::string>();
     } catch (...) {}
 
-    // 从 identification.yaml 读取 armature / damping / algorithm 默认值
+    // 从 inertia_identification.yaml 读取 armature / damping / algorithm 默认值
     {
-        std::string id_yaml = robot_utils::configPath(robot_dir, "identification.yaml");
+        std::string id_yaml = robot_utils::configPath(robot_dir, "inertia_identification.yaml");
         try {
             auto iroot = YAML::LoadFile(id_yaml);
             if (iroot["algorithm"])      algorithm      = iroot["algorithm"].as<int>();
@@ -274,7 +274,7 @@ int main(int argc, char* argv[]) {
             if (iroot["armature"])       armature       = iroot["armature"].as<bool>();
             if (iroot["damping"])        damping        = iroot["damping"].as<bool>();
         } catch (...) {
-            // identification.yaml 不存在或损坏时使用默认值
+            // inertia_identification.yaml 不存在或损坏时使用默认值
         }
     }
 
@@ -294,8 +294,8 @@ int main(int argc, char* argv[]) {
         else algos = {"IRLS"};
     }
 
-    std::string output_yaml = robot_utils::resultPath(robot_dir,
-        robot_name + "_identification.yaml");
+    std::string output_yaml = robot_utils::resultInertiaPath(robot_dir,
+        robot_name + "_inertia_identification.yaml");
 
     std::cout << "算法: ";
     for (auto& a : algos) std::cout << a << " ";

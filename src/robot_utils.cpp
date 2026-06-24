@@ -17,16 +17,37 @@ std::string configPath(const std::string& robot_dir, const std::string& filename
     return p.string();
 }
 
-std::string dataPath(const std::string& robot_dir, const std::string& filename) {
+std::string dataInertiaPath(const std::string& robot_dir, const std::string& filename) {
     std::filesystem::path p(robot_dir);
-    p /= "data";
+    p /= "data_inertia";
     p /= filename;
     return p.string();
 }
 
-std::string resultPath(const std::string& robot_dir, const std::string& filename) {
+std::string dataFrictionPath(const std::string& robot_dir, const std::string& filename) {
     std::filesystem::path p(robot_dir);
-    p /= "result";
+    p /= "data_friction";
+    p /= filename;
+    return p.string();
+}
+
+std::string resultInertiaPath(const std::string& robot_dir, const std::string& filename) {
+    std::filesystem::path p(robot_dir);
+    p /= "result_inertia";
+    p /= filename;
+    return p.string();
+}
+
+std::string resultFrictionPath(const std::string& robot_dir, const std::string& filename) {
+    std::filesystem::path p(robot_dir);
+    p /= "result_friction";
+    p /= filename;
+    return p.string();
+}
+
+std::string resultOthersPath(const std::string& robot_dir, const std::string& filename) {
+    std::filesystem::path p(robot_dir);
+    p /= "result_others";
     p /= filename;
     return p.string();
 }

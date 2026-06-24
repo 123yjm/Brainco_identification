@@ -10,7 +10,7 @@ plot_filtered_data.py — 绘制滤波后的激励轨迹数据
   figure4_tau.png — 关节力矩
 
 用法:
-  python3 scripts/plot_filtered_data.py --input result/filtered_data.csv
+  python3 scripts/plot_filtered_data.py --input result_inertia/filtered_data.csv
   python3 scripts/plot_filtered_data.py                        # 使用脚本内默认路径
 """
 
@@ -25,8 +25,8 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 # 默认输入路径（可直接修改）
 # ---------------------------------------------------------------------------
-# DEFAULT_INPUT = "/home/ubuntu/Desktop/brainco_identification/result/filtered_data.csv"
-DEFAULT_INPUT = "/home/ubuntu/Desktop/brainco_identification/data/revoarm_filtered_data_condnum_56.12_0618.csv"
+# DEFAULT_INPUT = "/home/ubuntu/Desktop/brainco_identification/result_inertia/filtered_data.csv"
+DEFAULT_INPUT = "/home/ubuntu/Desktop/brainco_identification/data_inertia/revoarm_filtered_data_condnum_56.12_0618.csv"
 # ---------------------------------------------------------------------------
 # 输出目录（相对于项目根目录，而非当前工作目录）
 # ---------------------------------------------------------------------------

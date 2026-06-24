@@ -169,7 +169,7 @@ int main(int argc, char* argv[]) {
     std::string robot_name     = robot_utils::robotNameFromDir(robot_dir);
     std::string friction_yaml  = robot_utils::configPath(robot_dir, "friction_trajectory.yaml");
     std::string kinematic_yaml = robot_utils::configPath(robot_dir, "kinematic_params.yaml");
-    std::string output_csv     = robot_utils::resultPath(robot_dir,
+    std::string output_csv     = robot_utils::resultFrictionPath(robot_dir,
         robot_name + "_friction_trajectory.csv");
 
     // ---- 加载 kinematic_params.yaml（仅取 dof）-------------------------------

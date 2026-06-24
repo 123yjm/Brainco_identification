@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
     std::string robot_name = robot_utils::robotNameFromDir(robot_dir);
     std::string config_yaml = robot_utils::configPath(robot_dir, "excite_trajectory.yaml");
     std::string kinematic_yaml = robot_utils::configPath(robot_dir, "kinematic_params.yaml");
-    std::string output_csv = robot_utils::resultPath(robot_dir,
+    std::string output_csv = robot_utils::resultInertiaPath(robot_dir,
         robot_name + "_excitation_trajectory.csv");
 
     // 读取 robot_type

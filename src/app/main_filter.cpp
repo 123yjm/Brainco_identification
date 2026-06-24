@@ -57,14 +57,14 @@ int main(int argc, char* argv[]) {
     if (stopband_override > 0) cfg.stopband_hz = stopband_override;
 
     std::string input_txt = robot_utils::findFirstFile(
-        robot_utils::dataPath(robot_dir, ""), "*.txt");
+        robot_utils::dataInertiaPath(robot_dir, ""), "*.txt");
     if (input_txt.empty()) {
-        std::cerr << "错误: 在 " << robot_utils::dataPath(robot_dir, "")
+        std::cerr << "错误: 在 " << robot_utils::dataInertiaPath(robot_dir, "")
                   << " 下未找到 .txt 文件\n";
         return 1;
     }
 
-    std::string output_csv = robot_utils::resultPath(robot_dir,
+    std::string output_csv = robot_utils::resultInertiaPath(robot_dir,
         robot_name + "_filtered_data.csv");
 
     // ---- 2. 打印配置 ------------------------------------------------------
@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
     filtered.tau_raw    = raw.motor_current;
 
     // ---- 6. 写入 CSV ------------------------------------------------------
-    std::filesystem::create_directories(robot_utils::resultPath(robot_dir, ""));
+    std::filesystem::create_directories(robot_utils::resultInertiaPath(robot_dir, ""));
     signal_processing::writeFilteredCsv(output_csv, filtered);
 
     std::cout << "输出: " << output_csv << "\n完成\n" << std::endl;

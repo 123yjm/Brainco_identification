@@ -20,13 +20,15 @@ ExperimentData DataLoader::loadCSV(const std::string &filename,
   // Detect if qdd columns exist by checking header or column count
   // Format with qdd: time, q0..qN, qd0..qdN, qdd0..qddN, tau0..tauN
   // Format without qdd: time, q0..qN, qd0..qdN, tau0..tauN
-  const std::size_t cols_with_qdd    = 1 + 4 * n_dof;   // 29 (filtered only)
-  const std::size_t cols_without_qdd = 1 + 3 * n_dof;   // 22
-  const std::size_t cols_with_raw    = 1 + 8 * n_dof;   // 57 (filtered + raw)
+  const std::size_t cols_without_qdd = 1 + 3 * n_dof;   // 22: time,q,qd,tau
+  const std::size_t cols_with_qdd    = 1 + 4 * n_dof;   // 29: time,q,qd,qdd,tau
+  const std::size_t cols_with_ref    = 1 + 6 * n_dof;   // 43: time,q,dq,tau,q_ref,dq_ref,tau_ref
+  const std::size_t cols_with_raw    = 1 + 8 * n_dof;   // 57: filtered+raw combined
 
   std::vector<double> time_vec;
   std::vector<std::vector<double>> q_vec, qd_vec, qdd_vec, tau_vec;
   bool has_qdd = false;
+  bool is_ref_format = false;   // 43-column raw format with q/dq/tau ref signals
   bool format_detected = false;
   std::size_t expected_cols = 0;
 
@@ -41,17 +43,26 @@ ExperimentData DataLoader::loadCSV(const std::string &filename,
 
     // Detect format on first data row
     if (!format_detected) {
-      if (row.size() == cols_with_qdd || row.size() >= cols_with_raw) {
-        has_qdd = true;
-        expected_cols = row.size();  // 允许 >= 29 的列数，后续行与此一致即可
-      } else if (row.size() == cols_without_qdd) {
+      if (row.size() == cols_without_qdd) {
         has_qdd = false;
         expected_cols = cols_without_qdd;
+      } else if (row.size() == cols_with_qdd) {
+        has_qdd = true;
+        expected_cols = cols_with_qdd;
+      } else if (row.size() == cols_with_ref) {
+        // 43-column raw format: [time, q_actual, dq_actual, tau_actual, q_ref, dq_ref, tau_ref]
+        has_qdd = false;
+        is_ref_format = true;
+        expected_cols = cols_with_ref;
+      } else if (row.size() >= cols_with_raw) {
+        has_qdd = true;
+        expected_cols = row.size();
       } else {
         throw std::runtime_error("CSV 列数与配置的机械臂自由度不匹配: " +
                                  std::to_string(row.size()) + " 列, 期望 " +
+                                 std::to_string(cols_without_qdd) + "、" +
                                  std::to_string(cols_with_qdd) + "、" +
-                                 std::to_string(cols_without_qdd) + " 或 " +
+                                 std::to_string(cols_with_ref) + " 或 " +
                                  std::to_string(cols_with_raw) + " 列");
       }
       format_detected = true;
@@ -67,19 +78,31 @@ ExperimentData DataLoader::loadCSV(const std::string &filename,
     time_vec.push_back(row[0]);
 
     std::vector<double> q_row, qd_row, qdd_row, tau_row;
-    for (std::size_t i = 0; i < n_dof; ++i)
-      q_row.push_back(row[1 + i]);
-    for (std::size_t i = 0; i < n_dof; ++i)
-      qd_row.push_back(row[1 + n_dof + i]);
 
-    if (has_qdd) {
+    if (is_ref_format) {
+      // 43-col: [time, q_actual(7), dq_actual(7), tau_actual(7), q_ref(7), dq_ref(7), tau_ref(7)]
       for (std::size_t i = 0; i < n_dof; ++i)
-        qdd_row.push_back(row[1 + 2 * n_dof + i]);
+        q_row.push_back(row[1 + i]);
       for (std::size_t i = 0; i < n_dof; ++i)
-        tau_row.push_back(row[1 + 3 * n_dof + i]);
-    } else {
+        qd_row.push_back(row[1 + n_dof + i]);
       for (std::size_t i = 0; i < n_dof; ++i)
         tau_row.push_back(row[1 + 2 * n_dof + i]);
+      // q_ref = cols 1+3*n_dof..1+4*n_dof, dq_ref, tau_ref — discarded
+    } else {
+      for (std::size_t i = 0; i < n_dof; ++i)
+        q_row.push_back(row[1 + i]);
+      for (std::size_t i = 0; i < n_dof; ++i)
+        qd_row.push_back(row[1 + n_dof + i]);
+
+      if (has_qdd) {
+        for (std::size_t i = 0; i < n_dof; ++i)
+          qdd_row.push_back(row[1 + 2 * n_dof + i]);
+        for (std::size_t i = 0; i < n_dof; ++i)
+          tau_row.push_back(row[1 + 3 * n_dof + i]);
+      } else {
+        for (std::size_t i = 0; i < n_dof; ++i)
+          tau_row.push_back(row[1 + 2 * n_dof + i]);
+      }
     }
 
     q_vec.push_back(q_row);

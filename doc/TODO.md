@@ -12,10 +12,10 @@
 ### 滤波器 — `filter_data`
 - [x] 5 阶 Butterworth 低通 + 零相位 `filtfilt` + 中心差分加速度
 - [x] 43 列 `.txt` → 29 列 `.csv`，输出与 MATLAB 一致
-- [x] `config/butterworth_filter.yaml` 可调参
+- [x] `config/butterworth_filter.yaml` 可调参，输入 `data_inertia/*.txt`，输出 `result_inertia/*_filtered_data.csv`
 - [x] Python 绑图脚本 `scripts/plot_filtered_data.py`
 
-### 辨识器 — `identify`
+### 辨识器 — `identify_inertia`
 - [x] 6 种算法：OLS / WLS / IRLS / TLS / EKF / NLS_FRICTION
 - [x] `RegressorFactory` 工厂模式，YAML 驱动 `kinematic_params.yaml`
 - [x] 阻尼项可选（`--no-damping`）
@@ -28,7 +28,7 @@
 - [x] 原始 `.txt` → 内存滤波 → 内存辨识 → 结果 `.yaml`，无中间 CSV
 
 ### QT 上位机 — `identify_gui`
-- [x] 图形化界面，通过 QProcess 调用 `identify` 二进制
+- [x] 图形化界面，通过 QProcess 调用 `identify_inertia` 二进制
 
 ### 编译
 - [x] `compile.sh` 一键编译

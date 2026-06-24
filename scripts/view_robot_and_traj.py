@@ -3,7 +3,7 @@
 view_traj.py — 机器人激励轨迹循环回放可视化
 
 基于 view_robot.py，在显示胶囊体机器人模型的基础上，
-循环回放 result/*_excitation_trajectory.csv 中的激励轨迹。
+循环回放 result_inertia/*_excitation_trajectory.csv 中的激励轨迹。
 
 Usage:
     conda activate mj_revoarm
@@ -40,7 +40,7 @@ def load_trajectory_csv(robot_name: str) -> tuple:
     dt: CSV 采样间隔 (s)
     """
     robot_dir = _resolve_robot_dir(robot_name)
-    result_dir = os.path.join(robot_dir, "result")
+    result_dir = os.path.join(robot_dir, "result_inertia")
 
     # 查找 *_excitation_trajectory.csv
     csv_path = None

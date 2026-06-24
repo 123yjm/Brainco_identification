@@ -23,8 +23,8 @@ import os
 # ---------------------------------------------------------------------------
 # 参数
 # ---------------------------------------------------------------------------
-CSV_PATH = "/home/ubuntu/Desktop/brainco_identification/robots/single_right/result/single_right_excitation_trajectory.csv"
-TXT_PATH = "/home/ubuntu/Desktop/brainco_identification/robots/single_right/result/single_right_excitation_trajectory.txt"
+CSV_PATH = "/home/ubuntu/Desktop/brainco_identification/robots/single_right/result_inertia/single_right_excitation_trajectory.csv"
+TXT_PATH = "/home/ubuntu/Desktop/brainco_identification/robots/single_right/result_inertia/single_right_excitation_trajectory.txt"
 
 DOF = 7
 SAMPLING_TIME = 10.0    # 激励轨迹运行时长 (s)

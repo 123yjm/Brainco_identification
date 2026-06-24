@@ -13,11 +13,20 @@ std::string robotNameFromDir(const std::string& robot_dir);
 /// 拼接配置文件路径: <robot_dir>/config/<filename>
 std::string configPath(const std::string& robot_dir, const std::string& filename);
 
-/// 拼接数据文件路径: <robot_dir>/data/<filename>
-std::string dataPath(const std::string& robot_dir, const std::string& filename);
+/// 惯性辨识 — 拼接采集数据路径: <robot_dir>/data_inertia/<filename>
+std::string dataInertiaPath(const std::string& robot_dir, const std::string& filename);
 
-/// 拼接结果文件路径: <robot_dir>/result/<filename>
-std::string resultPath(const std::string& robot_dir, const std::string& filename);
+/// 摩擦力辨识 — 拼接采集数据路径: <robot_dir>/data_friction/<filename>
+std::string dataFrictionPath(const std::string& robot_dir, const std::string& filename);
+
+/// 惯性辨识 — 拼接结果路径: <robot_dir>/result_inertia/<filename>
+std::string resultInertiaPath(const std::string& robot_dir, const std::string& filename);
+
+/// 摩擦力辨识 — 拼接结果路径: <robot_dir>/result_friction/<filename>
+std::string resultFrictionPath(const std::string& robot_dir, const std::string& filename);
+
+/// 其他输出: <robot_dir>/result_others/<filename>
+std::string resultOthersPath(const std::string& robot_dir, const std::string& filename);
 
 /// 在目录下查找第一个匹配 glob 的文件，返回完整路径；找不到返回空串。
 std::string findFirstFile(const std::string& directory, const std::string& glob);

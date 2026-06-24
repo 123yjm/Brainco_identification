@@ -14,7 +14,8 @@ build/
 *.swo
 
 # 运行输出结果
-result/
+result_inertia/
+result_friction/
 
 # CMake 缓存
 CMakeCache.txt

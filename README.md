@@ -5,9 +5,11 @@
 | 可执行文件 | 入口 | 功能 |
 |---|---|---|
 | `filter_data` | `src/app/main_filter.cpp` | 巴特沃斯低通滤波数据预处理 |
-| `filter_and_solve` | `src/app/main_filter_and_solve.cpp` | 滤波 + 辨识一站式管线（无中间 CSV） |
-| `get_excite_traj` | `src/app/main_get_excite_traj.cpp` | 傅里叶级数激励轨迹优化 |
-| `identify` | `src/app/main_solve.cpp` | 动力学参数辨识（6 种算法） |
+| `filter_and_solve` | `src/app/main_filter_and_solve.cpp` | 滤波 + 辨识一站式管线（无中间 CSV） |\n| `get_excite_traj` | `src/app/main_get_excite_traj.cpp` | 傅里叶级数激励轨迹优化 |
+| `get_friction_traj` | `src/app/main_get_friction_traj.cpp` | 摩擦力辨识轨迹生成 |
+| `calc_rank` | `src/app/main_calc_rank.cpp` | 观测矩阵秩分析 |
+| `identify_inertia` | `src/app/main_solve_inertia.cpp` | 惯性参数辨识（6 种算法） |
+| `identify_friction` | `src/app/main_solve_friction.cpp` | 摩擦力辨识（预留） |
 
 ---
 
@@ -29,7 +31,7 @@ sudo apt install libeigen3-dev libyaml-cpp-dev libnlopt-cxx-dev
 ./filter_data        --robot robots/revoarm_right
 ./filter_and_solve   --robot robots/revoarm_right
 ./get_excite_traj    --robot robots/revoarm_right
-./identify           --robot robots/revoarm_right
+./identify_inertia   --robot robots/revoarm_right
 ```
 
 ### 机器人目录结构
@@ -37,15 +39,20 @@ sudo apt install libeigen3-dev libyaml-cpp-dev libnlopt-cxx-dev
 ```
 robots/revoarm_right/
 ├── config/
-│   ├── butterworth_filter.yaml   # 滤波器参数
-│   ├── identification.yaml       # 辨识参数
-│   ├── excite_trajectory.yaml    # 轨迹优化参数
-│   └── kinematic_params.yaml     # 运动学/动力学参数
-├── data/                         # 原始 .txt 数据
-└── result/                       # 输出文件（自动带机器人前缀）
-    ├── revoarm_right_filtered_data.csv
-    ├── revoarm_right_identification.yaml
-    └── revoarm_right_excitation_trajectory.csv
+│   ├── butterworth_filter.yaml      # 滤波器参数
+│   ├── inertia_identification.yaml   # 惯性辨识参数
+│   ├── friction_identification.yaml  # 摩擦力辨识参数
+│   ├── excite_trajectory.yaml       # 激励轨迹优化参数
+│   ├── friction_trajectory.yaml     # 摩擦轨迹参数
+│   └── kinematic_params.yaml        # 运动学/动力学参数
+├── data_inertia/                    # 惯性激励轨迹采集数据 (*.txt)
+├── data_friction/                   # 摩擦轨迹采集数据 (*.txt)
+├── result_inertia/                  # 惯性辨识输出（自动带机器人前缀）
+│   ├── revoarm_right_filtered_data.csv
+│   ├── revoarm_right_inertia_identification.yaml
+│   └── revoarm_right_excitation_trajectory.csv
+└── result_friction/                 # 摩擦辨识输出
+    └── revoarm_right_friction_trajectory.csv
 ```
 
 ## 编译
@@ -62,12 +69,12 @@ cd build && cmake .. && make -j$(nproc)
 ./filter_data --robot robots/revoarm_right [--passband <Hz>] [--stopband <Hz>]
 ```
 
-自动找 `data/*.txt` 作为输入，输出 `result/<robot>_filtered_data.csv`。
+自动找 `data_inertia/*.txt` 作为输入，输出 `result_inertia/<robot>_filtered_data.csv`。
 
 ### 可视化
 
 ```bash
-python3 scripts/plot_filtered_data.py --input robots/revoarm_right/result/revoarm_right_filtered_data.csv
+python3 scripts/plot_filtered_data.py --input robots/revoarm_right/result_inertia/revoarm_right_filtered_data.csv
 ```
 
 ---
@@ -78,7 +85,7 @@ python3 scripts/plot_filtered_data.py --input robots/revoarm_right/result/revoar
 ./filter_and_solve --robot robots/revoarm_right [--algo <name>] [--no-armature] [--no-damping]
 ```
 
-数据流: `.txt` → 内存滤波 → `ExperimentData` → 辨识 → `<robot>_identification.yaml`
+数据流: `.txt` (data_inertia) → 内存滤波 → `ExperimentData` → 辨识 → `result_inertia/<robot>_inertia_identification.yaml`
 
 ---
 
@@ -88,17 +95,17 @@ python3 scripts/plot_filtered_data.py --input robots/revoarm_right/result/revoar
 ./get_excite_traj --robot robots/revoarm_right
 ```
 
-输出: `result/<robot>_excitation_trajectory.csv`
+输出: `result_inertia/<robot>_excitation_trajectory.csv`
 
 ---
 
-## 4. 动力学参数辨识器 — `identify`
+## 4. 惯性参数辨识器 — `identify_inertia`
 
 ```bash
-./identify --robot robots/revoarm_right [--algo <name>] [--no-armature] [--no-damping]
+./identify_inertia --robot robots/revoarm_right [--algo <name>] [--no-armature] [--no-damping]
 ```
 
-读已有 CSV: `result/<robot>_filtered_data.csv`，输出: `result/<robot>_identification.yaml`
+读已有 CSV: `result_inertia/<robot>_filtered_data.csv`，输出: `result_inertia/<robot>_inertia_identification.yaml`
 
 ### 支持的算法
 
@@ -112,7 +119,7 @@ python3 scripts/plot_filtered_data.py --input robots/revoarm_right/result/revoar
 | 8 | `NLS_FRICTION` | 非线性摩擦项 LM 优化 |
 | 0 | benchmark | 运行全部算法 |
 
-### 配置文件 `config/identification.yaml`
+### 配置文件 `config/inertia_identification.yaml`
 
 ```yaml
 # 算法编号 (algorithm):
@@ -125,7 +132,7 @@ damping: true          # 是否辨识粘性阻尼
 
 CLI `--algo` / `--no-armature` / `--no-damping` 可覆盖 YAML 配置。
 
-### 输出格式 `result/<robot>_identification.yaml`
+### 输出格式 `result_inertia/<robot>_inertia_identification.yaml`
 
 参数以流式 YAML 数组输出，按 10 个/行分组：
 
@@ -153,52 +160,52 @@ benchmark_results:
 ### 完整管线
 
 ```
-data/*.txt (原始数据, 43列无header)         Config YAML
-         │                                      │
+data_inertia/*.txt (原始数据, 43列无header)     Config YAML
+         │                                           │
          ├──► [filter_data] ◄── butterworth_filter.yaml
-         │         │                            │
-         │         ▼                            │
-         │   result/*_filtered_data.csv         │
-         │         │                            │
-         │         ▼                            │
-         └──► [identify] ◄── kinematic_params.yaml
-                   │            identification.yaml (可选)
+         │         │                                 │
+         │         ▼                                 │
+         │   result_inertia/*_filtered_data.csv      │
+         │         │                                 │
+         │         ▼                                 │
+         └──► [identify_inertia] ◄── kinematic_params.yaml
+                   │            inertia_identification.yaml (可选)
                    ▼
-            result/*_identification.yaml
+            result_inertia/*_inertia_identification.yaml
 ```
 
-`filter_and_solve` 是 `filter_data` + `identify` 的一站式版本，滤波在内存中完成不落盘：
+`filter_and_solve` 是 `filter_data` + `identify_inertia` 的一站式版本，滤波在内存中完成不落盘：
 
 ```
-data/*.txt ──► [filter_and_solve] ──► result/*_identification.yaml
+data_inertia/*.txt ──► [filter_and_solve] ──► result_inertia/*_inertia_identification.yaml
                     ▲
               butterworth_filter.yaml
               kinematic_params.yaml
-              identification.yaml (可选)
+              inertia_identification.yaml (可选)
 ```
 
 ### 各可执行文件输入来源
 
 | 可执行文件 | 输入文件 | 路径 | 必须 |
 |---|---|---|---|
-| `filter_data` | 原始数据 | `<robot_dir>/data/*.txt`（自动取首个） | ✅ |
+| `filter_data` | 原始数据 | `<robot_dir>/data_inertia/*.txt`（自动取首个） | ✅ |
 | | 滤波器配置 | `<robot_dir>/config/butterworth_filter.yaml` | ✅ |
-| `filter_and_solve` | 原始数据 | `<robot_dir>/data/*.txt` | ✅ |
+| `filter_and_solve` | 原始数据 | `<robot_dir>/data_inertia/*.txt` | ✅ |
 | | 滤波器配置 | `<robot_dir>/config/butterworth_filter.yaml` | ✅ |
 | | 运动学参数 | `<robot_dir>/config/kinematic_params.yaml` | ✅ |
-| | 辨识配置 | `<robot_dir>/config/identification.yaml` | 可选 |
-| `identify` | 已滤波数据 | `<robot_dir>/result/<robot>_filtered_data.csv` | ✅ |
+| | 辨识配置 | `<robot_dir>/config/inertia_identification.yaml` | 可选 |
+| `identify_inertia` | 已滤波数据 | `<robot_dir>/result_inertia/<robot>_filtered_data.csv` | ✅ |
 | | 运动学参数 | `<robot_dir>/config/kinematic_params.yaml` | ✅ |
-| | 辨识配置 | `<robot_dir>/config/identification.yaml` | 可选 |
+| | 辨识配置 | `<robot_dir>/config/inertia_identification.yaml` | 可选 |
 
-路径通过 `--robot <dir>` 自动推导（`config/`、`data/`、`result/` 子目录）。
+路径通过 `--robot <dir>` 自动推导（`config/`、`data_inertia/`、`data_friction/`、`result_inertia/`、`result_friction/` 子目录）。
 
 ### 辨识参数构成
 
 | 组别 | 数量 | 说明 |
 |------|------|------|
 | 惯性参数 | N_BODIES × 10 | 每个关节连杆: m, mx, my, mz, Ixx, Ixy, Ixz, Iyy, Iyz, Izz |
-| armature | N_DOF | 电机转子反映惯量（`identification.yaml` 中 `armature: false` 可关闭） |
-| damping | N_DOF | 粘性阻尼（`identification.yaml` 中 `damping: false` 可关闭） |
+| armature | N_DOF | 电机转子反映惯量（`inertia_identification.yaml` 中 `armature: false` 可关闭） |
+| damping | N_DOF | 粘性阻尼（`inertia_identification.yaml` 中 `damping: false` 可关闭） |
 
 对于 7-DOF revoarm: 默认 84 参数，关闭 armature+damping 后降至 70。

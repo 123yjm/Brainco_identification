@@ -52,7 +52,7 @@ void printHelp(const char* prog) {
         << "  --tol <value>         秩判定阈值乘数 (默认 1.0)\n"
         << "                          秩阈值 = tol * eps * max(m,n) * sigma_max\n"
         << "  --help                打印帮助信息\n\n"
-        << "若未指定 armature/damping，默认从 identification.yaml 读取。\n";
+        << "若未指定 armature/damping，默认从 inertia_identification.yaml 读取。\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -149,9 +149,9 @@ int main(int argc, char* argv[]) {
     std::string kinematic_yaml =
         robot_utils::configPath(opt.robot_dir, "kinematic_params.yaml");
     std::string id_yaml =
-        robot_utils::configPath(opt.robot_dir, "identification.yaml");
+        robot_utils::configPath(opt.robot_dir, "inertia_identification.yaml");
     std::string data_file =
-        robot_utils::resultPath(opt.robot_dir, robot_name + "_filtered_data.csv");
+        robot_utils::resultInertiaPath(opt.robot_dir, robot_name + "_filtered_data.csv");
 
     // ---- 读取 robot_type ---------------------------------------------------
     std::string robot_type = robot_name;
@@ -161,7 +161,7 @@ int main(int argc, char* argv[]) {
             robot_type = kroot["robot_type"].as<std::string>();
     } catch (...) {}
 
-    // ---- 读取 identification.yaml 默认值 -----------------------------------
+    // ---- 读取 inertia_identification.yaml 默认值 --------------------------
     try {
         auto iroot = YAML::LoadFile(id_yaml);
         if (!opt.armature_set && iroot["armature"])
