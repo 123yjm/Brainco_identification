@@ -1,15 +1,16 @@
 # Brainco Identification
 
-串联机械臂（7-DOF）动力学参数辨识工具链，包含四个独立可执行模块：
+串联机械臂（7-DOF）动力学参数辨识工具链，包含六个独立可执行模块：
 
 | 可执行文件 | 入口 | 功能 |
 |---|---|---|
 | `filter_data` | `src/app/main_filter.cpp` | 巴特沃斯低通滤波数据预处理 |
-| `filter_and_solve` | `src/app/main_filter_and_solve.cpp` | 滤波 + 辨识一站式管线（无中间 CSV） |\n| `get_excite_traj` | `src/app/main_get_excite_traj.cpp` | 傅里叶级数激励轨迹优化 |
-| `get_friction_traj` | `src/app/main_get_friction_traj.cpp` | 摩擦力辨识轨迹生成 |
+| `filter_and_solve` | `src/app/main_filter_and_solve.cpp` | 滤波 + 惯性辨识一站式管线（无中间 CSV） |
+| `get_excite_traj` | `src/app/main_get_excite_traj.cpp` | 傅里叶级数激励轨迹优化 |
+| `get_friction_traj` | `src/app/main_get_friction_traj.cpp` | 摩擦力辨识轨迹生成（分时匀速） |
 | `calc_rank` | `src/app/main_calc_rank.cpp` | 观测矩阵秩分析 |
 | `identify_inertia` | `src/app/main_solve_inertia.cpp` | 惯性参数辨识（6 种算法） |
-| `identify_friction` | `src/app/main_solve_friction.cpp` | 摩擦力辨识（预留） |
+| `identify_friction` | `src/app/main_solve_friction.cpp` | 摩擦力辨识 — Coulomb + Viscous 全数据点 OLS |
 
 ---
 
@@ -28,10 +29,12 @@ sudo apt install libeigen3-dev libyaml-cpp-dev libnlopt-cxx-dev
 所有入口函数统一使用 `--robot <dir>` 指向机器人目录，配置、数据、输出路径均自动推导。
 
 ```bash
-./filter_data        --robot robots/revoarm_right
-./filter_and_solve   --robot robots/revoarm_right
-./get_excite_traj    --robot robots/revoarm_right
-./identify_inertia   --robot robots/revoarm_right
+./filter_data          --robot robots/revoarm_right
+./filter_and_solve     --robot robots/revoarm_right
+./get_excite_traj      --robot robots/revoarm_right
+./get_friction_traj    --robot robots/revoarm_right
+./identify_inertia     --robot robots/revoarm_right
+./identify_friction    --robot robots/revoarm_right
 ```
 
 ### 机器人目录结构
@@ -39,20 +42,21 @@ sudo apt install libeigen3-dev libyaml-cpp-dev libnlopt-cxx-dev
 ```
 robots/revoarm_right/
 ├── config/
-│   ├── butterworth_filter.yaml      # 滤波器参数
-│   ├── inertia_identification.yaml   # 惯性辨识参数
-│   ├── friction_identification.yaml  # 摩擦力辨识参数
-│   ├── excite_trajectory.yaml       # 激励轨迹优化参数
-│   ├── friction_trajectory.yaml     # 摩擦轨迹参数
-│   └── kinematic_params.yaml        # 运动学/动力学参数
-├── data_inertia/                    # 惯性激励轨迹采集数据 (*.txt)
-├── data_friction/                   # 摩擦轨迹采集数据 (*.txt)
-├── result_inertia/                  # 惯性辨识输出（自动带机器人前缀）
+│   ├── butterworth_filter.yaml        # 滤波器参数
+│   ├── inertia_identification.yaml    # 惯性辨识参数
+│   ├── friction_identification.yaml   # 摩擦力辨识参数
+│   ├── excite_trajectory.yaml         # 激励轨迹优化参数
+│   ├── friction_trajectory.yaml       # 摩擦轨迹参数
+│   └── kinematic_params.yaml          # 运动学/动力学参数
+├── data_inertia/                      # 惯性激励轨迹采集数据 (*.txt)
+├── data_friction/                     # 摩擦轨迹采集数据 (*.csv)
+├── result_inertia/                    # 惯性辨识输出（自动带机器人前缀）
 │   ├── revoarm_right_filtered_data.csv
 │   ├── revoarm_right_inertia_identification.yaml
 │   └── revoarm_right_excitation_trajectory.csv
-└── result_friction/                 # 摩擦辨识输出
-    └── revoarm_right_friction_trajectory.csv
+└── result_friction/                   # 摩擦辨识输出
+    ├── revoarm_right_friction_trajectory.csv
+    └── revoarm_right_friction_identification.yaml
 ```
 
 ## 编译
@@ -79,7 +83,7 @@ python3 scripts/plot_filtered_data.py --input robots/revoarm_right/result_inerti
 
 ---
 
-## 2. 滤波 + 辨识一站式 — `filter_and_solve`
+## 2. 滤波 + 惯性辨识一站式 — `filter_and_solve`
 
 ```bash
 ./filter_and_solve --robot robots/revoarm_right [--algo <name>] [--no-armature] [--no-damping]
@@ -155,9 +159,109 @@ benchmark_results:
 
 ---
 
+## 5. 摩擦轨迹生成器 — `get_friction_traj`
+
+```bash
+./get_friction_traj --robot robots/revoarm_right
+```
+
+生成各关节分时匀速运动轨迹，用于摩擦力辨识数据采集。每个关节依次执行 4 段匀速运动：+v1, -v1, +v2, -v2，非运动关节锁定在 `q_init`。加减速阶段使用梯形（或三角形）速度 profile。
+
+输出: `result_friction/<robot>_friction_trajectory.csv`（CSV 格式与激励轨迹完全一致：`time, q0..q6, qd0..qd6, qdd0..qd6, tau0..tau6`）
+
+### 配置文件 `config/friction_trajectory.yaml`
+
+```yaml
+sampling_frequency: 100   # 输出采样频率 (Hz)
+acceleration: 2.0         # 加减速阶段加速度 (rad/s²)
+
+q_init:      [0, 0, 0, 0, 0, 0, 0]     # 各关节起始位置 (rad)
+q_target_v1: [-0.7, 0.7, -0.5, ...]     # 低速 v1 的目标位置 (rad)
+q_target_v2: [-1.5, 1.5, -1.0, ...]     # 高速 v2 的目标位置 (rad)
+
+v1: 0.1   # 低速 (rad/s)
+v2: 1.0   # 高速 (rad/s)
+```
+
+---
+
+## 6. 摩擦力辨识器 — `identify_friction`
+
+```bash
+./identify_friction --robot robots/revoarm_right
+```
+
+从 `data_friction/*.csv` 加载匀速段数据，使用已辨识的惯性参数 β 逐点精确扣除重力后，对每个关节独立做全数据点 OLS 线性回归，求解 Coulomb + Viscous 摩擦系数。
+
+### 摩擦模型
+
+$$\tau_{\text{friction}} = F_c \cdot \text{sign}(\dot{q}) + F_v \cdot \dot{q}$$
+
+### 辨识流程
+
+1. 加载 `data_friction/*.csv`（自动取首个 CSV）
+2. 加载已辨识的惯性参数 β（来自 `result_inertia/<robot>_inertia_identification.yaml`）
+3. 根据 `friction_trajectory.yaml` 计算各关节匀速段时间窗口
+4. 对每个关节，收集所有窗口内的数据点：
+   - 逐点计算重力力矩 $\tau_{\text{grav}}(q) = Y(q, 0, 0) \cdot \beta$
+   - 扣除重力: $\tau_{\text{ng}} = \tau - \tau_{\text{grav}}$
+5. 对每个关节独立 OLS 回归: $[\text{sign}(\dot{q}), \dot{q}] \cdot [F_c, F_v]^T = \tau_{\text{ng}}$
+6. 计算 RMSE: $\text{RMSE} = \sqrt{\frac{1}{n}\sum(\hat{\tau}_{\text{friction}} - \tau_{\text{ng}})^2}$
+
+### 配置文件 `config/friction_identification.yaml`
+
+```yaml
+interval_shrink: 0.8   # 匀速段时间窗口缩放因子（0~1），补偿控制延迟
+```
+
+### 输出格式 `result_friction/<robot>_friction_identification.yaml`
+
+```yaml
+calibration_date: "2026-06-24 21:27:15"
+robot: "revoarm_right"
+method: "ols_gravity_exact_removal"
+interval_shrink: 0.8
+parameters:
+  [
+    2.345, 1.023,
+    1.876, 0.954,
+    ...
+  ]
+```
+
+每关节一行两个参数: `Fc (Nm), Fv (Nm·s/rad)`。若辨识结果为负值，保存时自动 clamp 到 0。
+
+### 终端输出示例
+
+```
+═══════════════════════════════════════════
+  摩擦力辨识 — Coulomb + Viscous
+  (重力精确扣除 + 全数据点回归)
+═══════════════════════════════════════════
+机器人:           revoarm_right
+数据:             robots/revoarm_right/data_friction/friction_trajectory_xxx.csv
+样本数:           6943
+v1 / v2:          0.1 / 1 rad/s
+interval_shrink:  0.8
+
+j0: 1234 个数据点
+j1: 1187 个数据点
+...
+
+-------------------------------------------------------
+关节      Fc (Nm)        Fv (Nm·s/rad)   残差 RMSE   数据点数
+-------------------------------------------------------
+j0           2.345678        1.023456        0.123456
+j1           1.876543        0.954321        0.098765
+...
+-------------------------------------------------------
+```
+
+---
+
 ## 数据流与输入文件
 
-### 完整管线
+### 惯性辨识管线
 
 ```
 data_inertia/*.txt (原始数据, 43列无header)     Config YAML
@@ -184,6 +288,25 @@ data_inertia/*.txt ──► [filter_and_solve] ──► result_inertia/*_inert
               inertia_identification.yaml (可选)
 ```
 
+### 摩擦辨识管线
+
+```
+config/friction_trajectory.yaml ──► [get_friction_traj] ──► result_friction/*_friction_trajectory.csv
+                                                                        │
+                                                          (实机回放采集数据)
+                                                                        │
+                                                                        ▼
+                                                              data_friction/*.csv
+                                                                        │
+result_inertia/*_inertia_identification.yaml ──┐                       │
+                                                ├──► [identify_friction]
+config/friction_trajectory.yaml ───────────────┘        │
+config/friction_identification.yaml ────────────────────┘
+                                                                        │
+                                                                        ▼
+                                                              result_friction/*_friction_identification.yaml
+```
+
 ### 各可执行文件输入来源
 
 | 可执行文件 | 输入文件 | 路径 | 必须 |
@@ -194,9 +317,17 @@ data_inertia/*.txt ──► [filter_and_solve] ──► result_inertia/*_inert
 | | 滤波器配置 | `<robot_dir>/config/butterworth_filter.yaml` | ✅ |
 | | 运动学参数 | `<robot_dir>/config/kinematic_params.yaml` | ✅ |
 | | 辨识配置 | `<robot_dir>/config/inertia_identification.yaml` | 可选 |
+| `get_excite_traj` | 轨迹配置 | `<robot_dir>/config/excite_trajectory.yaml` | ✅ |
+| | 运动学参数 | `<robot_dir>/config/kinematic_params.yaml` | ✅ |
+| `get_friction_traj` | 轨迹配置 | `<robot_dir>/config/friction_trajectory.yaml` | ✅ |
+| | 运动学参数 | `<robot_dir>/config/kinematic_params.yaml` | ✅ |
 | `identify_inertia` | 已滤波数据 | `<robot_dir>/result_inertia/<robot>_filtered_data.csv` | ✅ |
 | | 运动学参数 | `<robot_dir>/config/kinematic_params.yaml` | ✅ |
 | | 辨识配置 | `<robot_dir>/config/inertia_identification.yaml` | 可选 |
+| `identify_friction` | 已采集数据 | `<robot_dir>/data_friction/*.csv`（自动取首个） | ✅ |
+| | 惯性参数 β | `<robot_dir>/result_inertia/<robot>_inertia_identification.yaml` | ✅ |
+| | 摩擦轨迹配置 | `<robot_dir>/config/friction_trajectory.yaml` | ✅ |
+| | 摩擦辨识配置 | `<robot_dir>/config/friction_identification.yaml` | ✅ |
 
 路径通过 `--robot <dir>` 自动推导（`config/`、`data_inertia/`、`data_friction/`、`result_inertia/`、`result_friction/` 子目录）。
 

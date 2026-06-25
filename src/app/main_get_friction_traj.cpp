@@ -188,7 +188,7 @@ int main(int argc, char* argv[]) {
 
     // ---- 加载 friction_trajectory.yaml -------------------------------------
     double sampling_freq, acceleration, v1, v2;
-    Eigen::VectorXd q_init, q_target;
+    Eigen::VectorXd q_init, q_target_v1, q_target_v2;
 
     try {
         auto root = YAML::LoadFile(friction_yaml);
@@ -197,11 +197,13 @@ int main(int argc, char* argv[]) {
         v1            = root["v1"].as<double>();
         v2            = root["v2"].as<double>();
         q_init        = parseVector(root["q_init"]);
-        q_target      = parseVector(root["q_target"]);
+        q_target_v1   = parseVector(root["q_target_v1"]);
+        q_target_v2   = parseVector(root["q_target_v2"]);
 
         if (static_cast<std::size_t>(q_init.size()) != dof ||
-            static_cast<std::size_t>(q_target.size()) != dof) {
-            std::cerr << "错误: q_init / q_target 维度必须等于 dof=" << dof << std::endl;
+            static_cast<std::size_t>(q_target_v1.size()) != dof ||
+            static_cast<std::size_t>(q_target_v2.size()) != dof) {
+            std::cerr << "错误: q_init / q_target_v1 / q_target_v2 维度必须等于 dof=" << dof << std::endl;
             return 1;
         }
     } catch (const std::exception& e) {
@@ -236,12 +238,13 @@ int main(int argc, char* argv[]) {
         double q_now = q_init(j);
 
         const int n_seg = 4;
-        double targets[4] = { q_target(j), q_init(j), q_target(j), q_init(j) };
+        double targets[4] = { q_target_v1(j), q_init(j), q_target_v2(j), q_init(j) };
         double speeds[4]  = { v1, v1, v2, v2 };
         const char* labels[4] = { "+v1", "-v1", "+v2", "-v2" };
 
         std::cout << "\n关节 " << j << " (q_init=" << q_init(j)
-                  << ", q_target=" << q_target(j) << "):\n";
+                  << ", q_target_v1=" << q_target_v1(j)
+                  << ", q_target_v2=" << q_target_v2(j) << "):\n";
 
         for (int s = 0; s < n_seg; ++s) {
             double q_goal = targets[s];
