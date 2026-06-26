@@ -26,6 +26,10 @@ public:
   VectorXd
   computeParameterVector(ParamFlags flags = ParamFlags::ALL) const override;
 
+  /// 返回参数已知掩码: true = 有显式先验, false = 未知需辨识
+  std::vector<bool>
+  computeParameterMask(ParamFlags flags = ParamFlags::ALL) const;
+
   std::size_t
   numParameters(ParamFlags flags = ParamFlags::ALL) const override;
 

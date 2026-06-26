@@ -30,6 +30,9 @@ public:
   /// 从运动学配置计算名义参数向量
   virtual VectorXd computeParameterVector(ParamFlags flags = ParamFlags::ALL) const = 0;
 
+  /// 返回参数已知掩码: true = 该参数有显式物理先验, false = 未知需辨识
+  virtual std::vector<bool> computeParameterMask(ParamFlags flags = ParamFlags::ALL) const = 0;
+
   /// 参数名列表（用于结果展示）
   virtual std::vector<std::string> getParameterNames(ParamFlags flags = ParamFlags::ALL) const = 0;
 

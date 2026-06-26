@@ -86,19 +86,44 @@ RobotConfig loadKinematicConfig(const std::string &yaml_path) {
     body.pos = parseVec3(body_node["pos"]);
     body.quat = parseQuat(body_node["quat"]);
 
-    // ---- 可选动力学字段（物理先验） ----
+    // ---- 可选动力学字段（物理先验）----
     if (body_node["mass"]) {
       body.mass = body_node["mass"].as<double>();
+      body.has_mass = true;
     }
-    body.com = parseVec3(body_node["com"]);
+
+    // COM: 优先解析分轴字段 com_x/com_y/com_z，回退到旧格式 com: [x,y,z]
+    bool has_any_com = false;
+    if (body_node["com_x"]) {
+      body.com.x() = body_node["com_x"].as<double>();
+      body.has_com_x = true;
+      has_any_com = true;
+    }
+    if (body_node["com_y"]) {
+      body.com.y() = body_node["com_y"].as<double>();
+      body.has_com_y = true;
+      has_any_com = true;
+    }
+    if (body_node["com_z"]) {
+      body.com.z() = body_node["com_z"].as<double>();
+      body.has_com_z = true;
+      has_any_com = true;
+    }
+    // 回退: 旧格式 com: [x, y, z] — 三者全都显式设定
+    if (!has_any_com && body_node["com"] && body_node["com"].IsSequence()) {
+      body.com = parseVec3(body_node["com"]);
+      body.has_com_x = true;
+      body.has_com_y = true;
+      body.has_com_z = true;
+    }
 
     // 惯量分量各自可选，默认 0
-    if (body_node["Ixx"]) body.Ixx = body_node["Ixx"].as<double>();
-    if (body_node["Iyy"]) body.Iyy = body_node["Iyy"].as<double>();
-    if (body_node["Izz"]) body.Izz = body_node["Izz"].as<double>();
-    if (body_node["Ixy"]) body.Ixy = body_node["Ixy"].as<double>();
-    if (body_node["Ixz"]) body.Ixz = body_node["Ixz"].as<double>();
-    if (body_node["Iyz"]) body.Iyz = body_node["Iyz"].as<double>();
+    if (body_node["Ixx"]) { body.Ixx = body_node["Ixx"].as<double>(); body.has_Ixx = true; }
+    if (body_node["Iyy"]) { body.Iyy = body_node["Iyy"].as<double>(); body.has_Iyy = true; }
+    if (body_node["Izz"]) { body.Izz = body_node["Izz"].as<double>(); body.has_Izz = true; }
+    if (body_node["Ixy"]) { body.Ixy = body_node["Ixy"].as<double>(); body.has_Ixy = true; }
+    if (body_node["Ixz"]) { body.Ixz = body_node["Ixz"].as<double>(); body.has_Ixz = true; }
+    if (body_node["Iyz"]) { body.Iyz = body_node["Iyz"].as<double>(); body.has_Iyz = true; }
 
     // ---- joint_axis：has_joint=true 时必填 ----
     if (body.has_joint) {

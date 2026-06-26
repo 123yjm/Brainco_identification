@@ -27,4 +27,10 @@ struct RigidBody {
   double Ixy = 0, Ixz = 0, Iyz = 0;
   Vector3d joint_axis{0, 0, 1};
   bool has_joint = false;
+
+  /// 标志位: 对应先验字段是否在 YAML 中显式设定
+  bool has_mass = false;
+  bool has_com_x = false, has_com_y = false, has_com_z = false;
+  bool has_Ixx = false, has_Iyy = false, has_Izz = false;
+  bool has_Ixy = false, has_Ixz = false, has_Iyz = false;
 };

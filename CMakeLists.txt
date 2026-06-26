@@ -41,6 +41,11 @@ add_executable(get_excite_traj src/app/main_get_excite_traj.cpp)
 target_compile_definitions(get_excite_traj PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(get_excite_traj PRIVATE brainco_id_core)
 
+# ---- 物理可行性 (PF) 辨识 ----
+add_executable(identify_PF src/app/main_solve_PF.cpp)
+target_compile_definitions(identify_PF PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(identify_PF PRIVATE brainco_id_core)
+
 # ---- 摩擦力辨识轨迹生成 ----
 add_executable(get_friction_traj src/app/main_get_friction_traj.cpp)
 target_compile_definitions(get_friction_traj PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")

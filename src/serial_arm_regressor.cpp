@@ -201,6 +201,38 @@ SerialArmRegressor::computeParameterVector(ParamFlags flags) const {
   return theta;
 }
 
+std::vector<bool>
+SerialArmRegressor::computeParameterMask(ParamFlags flags) const {
+  const std::size_t num_params = numParameters(flags);
+  std::vector<bool> mask(num_params, false);
+
+  for (std::size_t i = 0; i < n_bodies_; ++i) {
+    const auto& body = bodies_[i + kinematic_prefix_];
+    std::size_t offset = i * InertialParams::PARAMS_PER_BODY;
+
+    // m — 软约束: 作为先验引导但不固定 (由 PF 求解器施加惩罚)
+    mask[offset + 0] = false;
+
+    // mx, my, mz
+    mask[offset + 1] = body.has_com_x;
+    mask[offset + 2] = body.has_com_y;
+    mask[offset + 3] = body.has_com_z;
+
+    // 惯量参数: 仅当 COM 坐标系分量被显式设定时才标记为已知
+    // COM 贡献已在 computeParameterVector() 的 fromBody() 中计入先验值
+    mask[offset + 4] = body.has_Ixx;   // Ixx
+    mask[offset + 5] = body.has_Ixy;   // Ixy
+    mask[offset + 6] = body.has_Ixz;   // Ixz
+    mask[offset + 7] = body.has_Iyy;   // Iyy
+    mask[offset + 8] = body.has_Iyz;   // Iyz
+    mask[offset + 9] = body.has_Izz;   // Izz
+  }
+
+  // armature / damping 无物理先验（mask 默认 false）
+  (void)flags;
+  return mask;
+}
+
 std::vector<std::string>
 SerialArmRegressor::getParameterNames(ParamFlags flags) const {
   std::vector<std::string> names;

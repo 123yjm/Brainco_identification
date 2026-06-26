@@ -45,6 +45,13 @@ std::string resultFrictionPath(const std::string& robot_dir, const std::string& 
     return p.string();
 }
 
+std::string resultPFPath(const std::string& robot_dir, const std::string& filename) {
+    std::filesystem::path p(robot_dir);
+    p /= "result_pf";
+    p /= filename;
+    return p.string();
+}
+
 std::string resultOthersPath(const std::string& robot_dir, const std::string& filename) {
     std::filesystem::path p(robot_dir);
     p /= "result_others";

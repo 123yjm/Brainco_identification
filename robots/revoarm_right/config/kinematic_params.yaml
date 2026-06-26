@@ -17,6 +17,11 @@ bodies:
     mass: 0.99862
     joint_axis: [0.0, 1.0, 0.0]
     has_joint: true
+    Ixy: 0
+    Iyz: 0
+    Ixz: 0
+    com_x: 0
+    com_z: 0
 
   # ========== regressor body 1: right_arm_link2 ==========
   - name: "right_arm_link2"
@@ -25,6 +30,11 @@ bodies:
     mass: 0.1942
     joint_axis: [-1.0, 0.0, 0.0]
     has_joint: true
+    Ixy: 0
+    Iyz: 0
+    Ixz: 0
+    com_x: 0
+    com_y: 0
 
   # ========== regressor body 2: right_arm_link3 ==========
   - name: "right_arm_link3"
@@ -32,6 +42,11 @@ bodies:
     mass: 0.56897
     joint_axis: [0.0, 0.0, 1.0]
     has_joint: true
+    Ixy: 0
+    Iyz: 0
+    Ixz: 0
+    com_x: 0
+    com_y: 0
 
   # ========== regressor body 3: right_arm_link4 ==========
   - name: "right_arm_link4"
@@ -39,6 +54,11 @@ bodies:
     mass: 0.43039
     joint_axis: [0.0, -1.0, 0.0]
     has_joint: true
+    Ixy: 0
+    Iyz: 0
+    Ixz: 0
+    com_x: 0
+    com_y: 0
 
   # ========== regressor body 4: right_arm_link5 ==========
   - name: "right_arm_link5"
@@ -46,6 +66,11 @@ bodies:
     mass: 0.80969
     joint_axis: [0.0, 0.0, 1.0]
     has_joint: true
+    Ixy: 0
+    Iyz: 0
+    Ixz: 0
+    com_x: 0
+    com_y: 0
 
   # ========== regressor body 5: right_arm_link6 ==========
   - name: "right_arm_link6"
@@ -53,6 +78,11 @@ bodies:
     mass: 0.31466
     joint_axis: [1.0, 0.0, 0.0]
     has_joint: true
+    Ixy: 0
+    Iyz: 0
+    Ixz: 0
+    com_x: 0
+    com_z: 0
 
   # ========== regressor body 6: right_arm_link7 ==========
   # (合并了 connector_link + hand_base_link 的质量和惯量)
@@ -61,3 +91,8 @@ bodies:
     mass: 0.73111
     joint_axis: [0.0, -1.0, 0.0]
     has_joint: true
+    Ixy: 0
+    Iyz: 0
+    Ixz: 0
+    com_x: 0
+    com_y: 0
