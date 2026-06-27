@@ -1,0 +1,108 @@
+# 动力学先验参数 — 仅对不可辨识参数填入先验值 (来自 MuJoCo XML)
+# 可辨识参数全部填 null, 由基参数方程求解
+# 参数顺序: [m, mx, my, mz, Ixx, Ixy, Ixz, Iyy, Iyz, Izz]
+# mx/my/mz = COM_pos × mass (平行轴定理转换到 body origin)
+# 惯量 = COM 系惯量 + 平行轴偏移 (转换到 body origin)
+
+robot_type: "serial_arm"
+dof: 7
+
+bodies:
+  # ========== regressor body 0: right_arm_link1 ==========
+  # 不可辨识: 8/10, 可辨识: 2/10
+  - name: "right_arm_link1"
+    inertial_params:
+      m: 9.98620000e-01
+      mx: 1.38070446e-03
+      my: -5.26395999e-02
+      mz: null
+      Ixx: 4.12168366e-03
+      Ixy: -6.34227997e-05
+      Ixz: -1.33183616e-06
+      Iyy: null
+      Iyz: 1.13073940e-04
+      Izz: 3.81010432e-03
+  # ========== regressor body 1: right_arm_link2 ==========
+  # 不可辨识: 2/10, 可辨识: 8/10
+  - name: "right_arm_link2"
+    inertial_params:
+      m: 1.94200000e-01
+      mx: null
+      my: null
+      mz: null
+      Ixx: null
+      Ixy: null
+      Ixz: null
+      Iyy: 5.09668369e-04
+      Iyz: null
+      Izz: null
+  # ========== regressor body 2: right_arm_link3 ==========
+  # 不可辨识: 1/10, 可辨识: 9/10
+  - name: "right_arm_link3"
+    inertial_params:
+      m: 5.68970000e-01
+      mx: null
+      my: null
+      mz: null
+      Ixx: null
+      Ixy: null
+      Ixz: null
+      Iyy: null
+      Iyz: null
+      Izz: null
+  # ========== regressor body 3: right_arm_link4 ==========
+  # 不可辨识: 1/10, 可辨识: 9/10
+  - name: "right_arm_link4"
+    inertial_params:
+      m: 4.30390000e-01
+      mx: null
+      my: null
+      mz: null
+      Ixx: null
+      Ixy: null
+      Ixz: null
+      Iyy: null
+      Iyz: null
+      Izz: null
+  # ========== regressor body 4: right_arm_link5 ==========
+  # 不可辨识: 0/10, 可辨识: 10/10
+  - name: "right_arm_link5"
+    inertial_params:
+      m: null
+      mx: null
+      my: null
+      mz: null
+      Ixx: null
+      Ixy: null
+      Ixz: null
+      Iyy: null
+      Iyz: null
+      Izz: null
+  # ========== regressor body 5: right_arm_link6 ==========
+  # 不可辨识: 0/10, 可辨识: 10/10
+  - name: "right_arm_link6"
+    inertial_params:
+      m: null
+      mx: null
+      my: null
+      mz: null
+      Ixx: null
+      Ixy: null
+      Ixz: null
+      Iyy: null
+      Iyz: null
+      Izz: null
+  # ========== regressor body 6: right_arm_link7 ==========
+  # 不可辨识: 1/10, 可辨识: 9/10
+  - name: "right_arm_link7"
+    inertial_params:
+      m: 7.31110000e-01
+      mx: null
+      my: null
+      mz: null
+      Ixx: null
+      Ixy: null
+      Ixz: null
+      Iyy: null
+      Iyz: null
+      Izz: null

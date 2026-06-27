@@ -18,6 +18,7 @@ add_library(brainco_id_core
   src/regressor_factory.cpp
   src/trajectory_optimizer.cpp
   src/robot_utils.cpp
+  src/base_parameter.cpp
 )
 target_include_directories(brainco_id_core PUBLIC include ${EIGEN3_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIR} ${NLOPT_INCLUDE_DIRS})
 target_link_libraries(brainco_id_core PUBLIC Eigen3::Eigen ${YAML_CPP_LIBRARIES} ${NLOPT_LIBRARIES})
@@ -50,6 +51,11 @@ target_link_libraries(get_friction_traj PRIVATE brainco_id_core)
 add_executable(calc_rank src/app/main_calc_rank.cpp)
 target_compile_definitions(calc_rank PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(calc_rank PRIVATE brainco_id_core)
+
+# ---- 最小惯性参数集辨识 (QR column-pivoting 分解) ----
+add_executable(identify_base_inertia src/app/main_solve_base_inertia.cpp)
+target_compile_definitions(identify_base_inertia PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(identify_base_inertia PRIVATE brainco_id_core)
 
 # ---- Qt 上位机（独立可执行文件，与辨识核心解耦）----
 find_package(Qt5Widgets REQUIRED)
