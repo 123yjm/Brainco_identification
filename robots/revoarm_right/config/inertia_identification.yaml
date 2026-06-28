@@ -1,4 +1,4 @@
-# Identification Configuration — revoarm_right
+# 惯性参数辨识配置 — revoarm_right
 # robot / kinematic_params / data_file / output_file 由入口函数自动推导。
 #
 # 算法编号 (algorithm):
@@ -8,8 +8,21 @@
 #   4 = TLS  整体最小二乘
 #   5 = EKF  扩展卡尔曼滤波
 #   8 = NLS_FRICTION 非线性摩擦辨识
-#   0 = 运行全部算法 (benchmark)
-# regularization: 1=开启 Tikhonov 正则化, 0=关闭
+#   9 = PCTIKHONOV   PC 辨识（先验中心 Tikhonov 正则化）
+#   0 = 运行全部算法 (benchmark, 不含 PCTIKHONOV)
+#
+# regularization: 1=开启零中心 Tikhonov 正则化 (λ=1e-6), 0=关闭
+#   (PCTIKHONOV 使用独立的 pc_lambda 参数)
+#
+# 算法 9 = PCTIKHONOV 说明:
+#   先决条件:
+#     1. 先运行 identify_friction 获取 Fc, Fv
+#     2. 确保 config/inertia_prior.yaml 存在（CAD 先验）
+#   推荐配置:
+#     algorithm: 9
+#     armature: false
+#     damping: false
+#     pc_lambda: 1.0e-3  # 正则化强度, 0=退化为摩擦修正后的 OLS
 
 algorithm: 1
 regularization: 1

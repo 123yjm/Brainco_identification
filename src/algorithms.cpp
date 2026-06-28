@@ -57,6 +57,8 @@ createAlgorithm(const std::string &type, int dof) {
   }
   if (type == "NLS_FRICTION")
     return std::make_unique<NonlinearFrictionLM>(dof);
+  if (type == "PCTIKHONOV")
+    return std::make_unique<PCTikhonov>();
 
   std::cerr << "Unknown algorithm type: " << type << ". Defaulting to OLS."
             << std::endl;
@@ -416,6 +418,55 @@ Eigen::VectorXd NonlinearFrictionLM::solve(const Eigen::MatrixXd &W_base,
   }
 
   return best_params;
+}
+
+// =============================================================================
+// PCTikhonov — Prior-Centered Tikhonov Regularization (支持逐参数权重)
+//   求解: min ||W*beta - tau||² + Σ w_i * (beta_i - beta_prior_i)²
+//   正规方程: (W^T W + diag(w)) * beta = W^T * tau + w⊙beta_prior
+// =============================================================================
+PCTikhonov::PCTikhonov(double lambda) : lambda_(lambda) {}
+
+void PCTikhonov::setPrior(const Eigen::VectorXd &beta_prior) {
+  beta_prior_ = beta_prior;
+}
+
+void PCTikhonov::setLambda(double lambda) { lambda_ = lambda; }
+
+void PCTikhonov::setRegularizationWeights(const Eigen::VectorXd &weights) {
+  weights_ = weights;
+}
+
+Eigen::VectorXd PCTikhonov::solve(const Eigen::MatrixXd &W,
+                                   const Eigen::VectorXd &Tau_meas) {
+  const Eigen::Index n_params = W.cols();
+
+  if (beta_prior_.size() == 0) {
+    throw std::runtime_error(
+        "PCTikhonov: 未设置先验参数，请在 solve() 前调用 setPrior()。");
+  }
+  if (beta_prior_.size() != n_params) {
+    throw std::runtime_error(
+        "PCTikhonov: 先验维度不匹配。期望 " + std::to_string(n_params) +
+        "，实际 " + std::to_string(beta_prior_.size()));
+  }
+
+  // 构建逐参数权重向量: 若设置了 weights_ 则用逐参数权重，否则用标量 lambda
+  Eigen::VectorXd w(n_params);
+  if (weights_.size() == static_cast<Eigen::Index>(n_params)) {
+    w = weights_;
+  } else {
+    w.setConstant(lambda_);
+  }
+
+  // (W^T W + diag(w))
+  Eigen::MatrixXd WtW = W.transpose() * W;
+  WtW.diagonal() += w;
+
+  // RHS = W^T * tau + w⊙beta_prior (逐元素乘)
+  Eigen::VectorXd rhs = W.transpose() * Tau_meas + w.cwiseProduct(beta_prior_);
+
+  return WtW.ldlt().solve(rhs);
 }
 
 } // namespace identification

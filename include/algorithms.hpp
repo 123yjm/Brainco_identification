@@ -89,6 +89,34 @@ private:
   Eigen::MatrixXd qd_meas_;
 };
 
+// Prior-Centered Tikhonov 正则化 (Physical Consistent 辨识)
+// 求解: min ||W*beta - tau||² + ||beta - beta_prior||²_Λ
+// 正规方程: (W^T W + diag(weights)) * beta = W^T * tau + weights⊙beta_prior
+class PCTikhonov : public IdentificationAlgorithm {
+public:
+  /// @param lambda  正则化强度 (默认 1e-3)，0 退化为普通 OLS
+  explicit PCTikhonov(double lambda = 1e-3);
+
+  /// 设置先验参数向量（必须在 solve() 前调用）
+  void setPrior(const Eigen::VectorXd &beta_prior);
+
+  /// 覆盖构造后的正则化强度 (标量，等价于所有权重相同)
+  void setLambda(double lambda);
+  double lambda() const { return lambda_; }
+
+  /// 设置逐参数正则化权重向量 (优先级高于标量 lambda)
+  /// 权重与 beta 同维度: w[i] 控制 beta[i] 被拉向 beta_prior[i] 的强度
+  void setRegularizationWeights(const Eigen::VectorXd &weights);
+
+  Eigen::VectorXd solve(const Eigen::MatrixXd &W,
+                        const Eigen::VectorXd &Tau_meas) override;
+
+private:
+  double lambda_;
+  Eigen::VectorXd beta_prior_;
+  Eigen::VectorXd weights_;  // 逐参数正则化权重，为空则使用 lambda_ 标量
+};
+
 // Factory
 std::unique_ptr<IdentificationAlgorithm>
 createAlgorithm(const std::string &type, int dof = 7);
