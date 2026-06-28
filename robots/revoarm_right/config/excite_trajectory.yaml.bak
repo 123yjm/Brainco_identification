@@ -13,8 +13,8 @@ q_max: [ 0.7,  1.65,  2.09,  2.21, 0.55,  0.54,  1.57]
 q_dot_max:  [1.396, 1.396, 1.396, 1.396, 1.396, 1.396, 1.396]
 q_ddot_max: [4.189, 4.189, 4.189, 4.189, 4.189, 4.189, 4.189]
 
-multi_start_count: 1
-max_iterations: 500
+multi_start_count: 8
+max_iterations: 15000
 ftol_rel: 1.0e-10
 
 # --- 目标函数配置 (可选, 默认 d_optimal) ---

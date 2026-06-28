@@ -295,7 +295,7 @@ int main(int argc, char *argv[]) {
   std::string algo_name = "OLS";
   bool friction_sub = true;
   bool armature = false;
-  double tol = 1.0;
+  double tol = 100.0;
 
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
@@ -329,12 +329,17 @@ int main(int argc, char *argv[]) {
   std::string robot_name = robot_utils::robotNameFromDir(robot_dir);
   std::string kinematic_yaml =
       robot_utils::configPath(robot_dir, "kinematic_params.yaml");
+  // 从 data_base_inertia 找数据文件 (CSV优先, 再TXT)
   std::string data_file =
-      robot_utils::resultInertiaPath(robot_dir, robot_name + "_filtered_data.csv");
+      robot_utils::findFirstFile(
+          robot_utils::dataBaseInertiaPath(robot_dir, ""), "*.csv");
+  if (data_file.empty())
+    data_file = robot_utils::findFirstFile(
+        robot_utils::dataBaseInertiaPath(robot_dir, ""), "*.txt");
   std::string friction_yaml =
       robot_utils::resultFrictionPath(robot_dir, robot_name + "_friction_identification.yaml");
   std::string output_file =
-      robot_utils::resultInertiaPath(robot_dir, robot_name + "_base_inertia_identification.yaml");
+      robot_utils::resultBaseInertiaPath(robot_dir, robot_name + "_base_inertia_identification.yaml");
 
   // ---- robot_type ---------------------------------------------------------
   std::string robot_type = robot_name;
@@ -401,6 +406,24 @@ int main(int argc, char *argv[]) {
     }
   } else {
     std::cout << "摩擦扣除: OFF (--no-friction-sub)\n";
+  }
+
+  // ---- 数值微分计算 qdd (如果数据中不包含) ---------------------------------
+  if (data.qdd.rows() == 0 || data.qdd.cols() == 0) {
+    data.qdd.resize(data.n_samples, n_dof);
+    double dt_est = data.time[1] - data.time[0];
+    for (std::size_t j = 0; j < n_dof; ++j) {
+      // 中央差分
+      for (Eigen::Index i = 1; i < static_cast<Eigen::Index>(data.n_samples) - 1; ++i) {
+        data.qdd(i, j) = (data.qd(i+1, j) - data.qd(i-1, j)) / (2.0 * dt_est);
+      }
+      // 端点用前向/后向差分
+      data.qdd(0, j) = (data.qd(1, j) - data.qd(0, j)) / dt_est;
+      data.qdd(static_cast<Eigen::Index>(data.n_samples)-1, j) =
+          (data.qd(static_cast<Eigen::Index>(data.n_samples)-1, j) -
+           data.qd(static_cast<Eigen::Index>(data.n_samples)-2, j)) / dt_est;
+    }
+    std::cout << "qdd 已通过数值微分计算 (dt=" << dt_est << " s)\n";
   }
 
   // ---- 构建观测矩阵 W + 扣除摩擦 ------------------------------------------
@@ -507,14 +530,15 @@ int main(int argc, char *argv[]) {
 
   std::cout << "\n基回归矩阵: " << W_base.rows() << " × " << W_base.cols() << "\n";
 
-  auto solver = identification::createAlgorithm(algo_name, static_cast<int>(n_dof));
-  if (!solver) {
-    std::cerr << "错误: 不支持的算法 — " << algo_name << "\n";
-    return 1;
-  }
-  solver->setUseRegularization(false); // 基回归矩阵列满秩，无需正则化
+  // ---- W_base 条件数 --------------------------------------------------------
+  double lambda = 1e-4;
+  std::cout << "W_base 条件数: " << std::scientific << dec.cond_R1
+            << "  → λ=" << lambda << "\n";
 
-  Eigen::VectorXd beta_base = solver->solve(W_base, tau_stacked);
+  // ---- OLS + Tikhonov 正则化 -----------------------------------------------
+  Eigen::MatrixXd WtW = W_base.transpose() * W_base;
+  WtW += lambda * Eigen::MatrixXd::Identity(WtW.rows(), WtW.cols());
+  Eigen::VectorXd beta_base = WtW.ldlt().solve(W_base.transpose() * tau_stacked);
 
   // ---- 残差 (基空间) -------------------------------------------------------
   Eigen::VectorXd residual_base = W_base * beta_base - tau_stacked;
@@ -527,33 +551,61 @@ int main(int argc, char *argv[]) {
             << ", MaxErr=" << max_err_base << " Nm\n";
 
   // ---- 映射到全参数空间 ----------------------------------------------------
-  Eigen::VectorXd beta_full =
+  // 优先从 dynamic_prior_params.yaml 加载（含 COM+惯量），否则回退
+  std::string prior_yaml = robot_utils::configPath(robot_dir, "dynamic_prior_params.yaml");
+  Eigen::VectorXd beta_prior(static_cast<Eigen::Index>(num_params));
+  beta_prior.setZero();
+  bool prior_loaded = false;
+  try {
+    auto proot = YAML::LoadFile(prior_yaml);
+    auto bodies_node = proot["bodies"];
+    const char* pnames[] = {"m","mx","my","mz","Ixx","Ixy","Ixz","Iyy","Iyz","Izz"};
+    for (std::size_t b = 0; b < n_bodies && b < bodies_node.size(); ++b) {
+      auto ip = bodies_node[b]["inertial_params"];
+      Eigen::Index base = static_cast<Eigen::Index>(b * 10);
+      for (int j = 0; j < 10; ++j) {
+        auto node = ip[pnames[j]];
+        if (node && !node.IsNull())
+          beta_prior(base + j) = node.as<double>();
+        else
+          beta_prior(base + j) = std::numeric_limits<double>::quiet_NaN();
+      }
+    }
+    prior_loaded = true;
+    std::cout << "先验来源: " << prior_yaml << " (含 COM+惯量)\n";
+  } catch (...) {
+    beta_prior = regressor->computeParameterVector(flags);
+    std::cout << "先验来源: kinematic_params.yaml (仅 mass)\n";
+  }
+  Eigen::VectorXd beta_full_zero =
       robot_dynamics::BaseParameterDecomposition::baseToFull(beta_base, dec);
+  Eigen::VectorXd beta_full =
+      robot_dynamics::BaseParameterDecomposition::baseToFullWithPrior(
+          beta_base, beta_prior, dec);
 
-  // ---- 残差 (全空间) -------------------------------------------------------
-  Eigen::VectorXd residual_full = W_full * beta_full - tau_stacked;
-  double rmse_full = std::sqrt(residual_full.squaredNorm() /
-                               static_cast<double>(tau_stacked.size()));
-  double max_err_full = residual_full.cwiseAbs().maxCoeff();
+  // ---- 残差 (两种方法) ----------------------------------------------------
+  Eigen::VectorXd res_zero = W_full * beta_full_zero - tau_stacked;
+  Eigen::VectorXd res_prior = W_full * beta_full - tau_stacked;
+  double rmse_zero = std::sqrt(res_zero.squaredNorm() / static_cast<double>(tau_stacked.size()));
+  double rmse_prior = std::sqrt(res_prior.squaredNorm() / static_cast<double>(tau_stacked.size()));
+  double max_err_prior = res_prior.cwiseAbs().maxCoeff();
 
-  std::cout << "全参数重建: 维度=" << beta_full.size()
-            << ", RMSE=" << rmse_full << " Nm"
-            << ", MaxErr=" << max_err_full << " Nm\n";
+  std::cout << "\n─────────────── 重建对比 ───────────────\n";
+  std::cout << std::scientific << std::setprecision(4);
+  std::cout << "              零先验          CAD先验\n";
+  std::cout << "RMSE:         " << rmse_zero << "       " << rmse_prior << " Nm\n";
+  std::cout << "一致性:       " << (W_full * beta_full_zero - W_base * beta_base).norm()
+            << "       " << (W_full * beta_full - W_base * beta_base).norm() << "\n";
+  std::cout << std::fixed;
 
-  // ---- 一致性检查 ----------------------------------------------------------
-  double mismatch = (W_full * beta_full - W_base * beta_base).norm();
-  std::cout << "一致性: ||W·β_full - W_base·β_base|| = " << std::scientific
-            << mismatch << std::fixed << "\n";
+  // C 矩阵验证
+  std::cout << "||C·β_zero - β_base||: " << std::scientific << (C_matrix * beta_full_zero - beta_base).norm() << "\n";
+  std::cout << "||C·β_prior - β_base||: " << (C_matrix * beta_full - beta_base).norm() << "\n";
+  std::cout << std::fixed;
 
-  // C 矩阵一致性: C · β_full 应等于 β_base (机器精度内)
-  Eigen::VectorXd beta_base_check = C_matrix * beta_full;
-  double c_mismatch = (beta_base_check - beta_base).norm();
-  std::cout << "C 矩阵验证: ||C·β_full - β_base|| = " << std::scientific
-            << c_mismatch << std::fixed << "\n";
-
-  // ---- 输出全参数 ----------------------------------------------------------
+  // ---- 输出全参数 (CAD 先验) ----------------------------------------------
   printSep();
-  std::cout << "全参数重建 (惯性参数, 每 body 一行 10 个):\n";
+  std::cout << "全参数重建 (不可辨识=CAD先验, 可辨识=数据求解):\n";
   for (std::size_t b = 0; b < n_bodies; ++b) {
     Eigen::Index base = static_cast<Eigen::Index>(b * 10);
     std::cout << "  body " << b << ": [";
@@ -579,7 +631,7 @@ int main(int argc, char *argv[]) {
                   friction_loaded, armature, dec,
                   beta_base, beta_full,
                   rmse_base, max_err_base,
-                  rmse_full, max_err_full,
+                  rmse_prior, max_err_prior,
                   n_bodies, full_names,
                   formulas, C_matrix);
 

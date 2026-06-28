@@ -1,108 +1,97 @@
-# 动力学先验参数 — 仅对不可辨识参数填入先验值 (来自 MuJoCo XML)
-# 可辨识参数全部填 null, 由基参数方程求解
-# 参数顺序: [m, mx, my, mz, Ixx, Ixy, Ixz, Iyy, Iyz, Izz]
-# mx/my/mz = COM_pos × mass (平行轴定理转换到 body origin)
-# 惯量 = COM 系惯量 + 平行轴偏移 (转换到 body origin)
+# 由 generate_prior_yaml.py 自动生成
+# 来源: /home/ubuntu/Desktop/Robot-Parameter-Indentification-Simulation/revoarm_right/revoarm_right.xml
+# 平行轴定理: COM → body origin
+# null = 可辨识，待数据求解; 数值 = 不可辨识，CAD 先验
 
 robot_type: "serial_arm"
-dof: 7
+num_bodies: 7
+description: >
+  动态先验参数 — 从 MuJoCo XML 提取，经平行轴定理转换到 body origin 坐标系。
+  link7 合并了 connector_link + hand_base_link。
+  所有 70 个参数均填入 CAD 值；baseToFullWithPrior 自动选取不可辨识部分。
 
 bodies:
-  # ========== regressor body 0: right_arm_link1 ==========
-  # 不可辨识: 8/10, 可辨识: 2/10
   - name: "right_arm_link1"
     inertial_params:
-      m: 9.98620000e-01
-      mx: 1.38070446e-03
-      my: -5.26395999e-02
-      mz: null
-      Ixx: 4.12168366e-03
-      Ixy: -6.34227997e-05
-      Ixz: -1.33183616e-06
-      Iyy: null
-      Iyz: 1.13073940e-04
-      Izz: 3.81010432e-03
-  # ========== regressor body 1: right_arm_link2 ==========
-  # 不可辨识: 2/10, 可辨识: 8/10
+      m: 9.986200000000e-01
+      mx: 1.380704460168e-03
+      my: -5.263959991353e-02
+      mz: -1.214842680467e-03
+      Ixx: 4.121683657660e-03
+      Ixy: 8.213753432200e-05
+      Ixz: 2.027477104393e-06
+      Iyy: 8.375224483414e-04
+      Iyz: -1.500046768061e-05
+      Izz: 3.810104322972e-03
   - name: "right_arm_link2"
     inertial_params:
-      m: 1.94200000e-01
-      mx: null
-      my: null
-      mz: null
-      Ixx: null
-      Ixy: null
-      Ixz: null
-      Iyy: 5.09668369e-04
-      Iyz: null
-      Izz: null
-  # ========== regressor body 2: right_arm_link3 ==========
-  # 不可辨识: 1/10, 可辨识: 9/10
+      m: 1.942000000000e-01
+      mx: 1.058940123192e-06
+      my: -5.484813533932e-05
+      mz: -5.222298642578e-03
+      Ixx: 5.230756247763e-04
+      Ixy: 9.489786297605e-07
+      Ixz: -2.156377231647e-06
+      Iyy: 5.096683689629e-04
+      Iyz: 8.388838202744e-07
+      Izz: 2.072959985109e-04
   - name: "right_arm_link3"
     inertial_params:
-      m: 5.68970000e-01
-      mx: null
-      my: null
-      mz: null
-      Ixx: null
-      Ixy: null
-      Ixz: null
-      Iyy: null
-      Iyz: null
-      Izz: null
-  # ========== regressor body 3: right_arm_link4 ==========
-  # 不可辨识: 1/10, 可辨识: 9/10
+      m: 5.689700000000e-01
+      mx: -2.586364737282e-04
+      my: 1.777745554733e-05
+      mz: -3.794686649850e-02
+      Ixx: 3.873264177793e-03
+      Ixy: -1.093515865790e-06
+      Ixz: -2.623621962018e-05
+      Iyy: 3.844053619509e-03
+      Iyz: 3.062286681020e-06
+      Izz: 4.922724440315e-04
   - name: "right_arm_link4"
     inertial_params:
-      m: 4.30390000e-01
-      mx: null
-      my: null
-      mz: null
-      Ixx: null
-      Ixy: null
-      Ixz: null
-      Iyy: null
-      Iyz: null
-      Izz: null
-  # ========== regressor body 4: right_arm_link5 ==========
-  # 不可辨识: 0/10, 可辨识: 10/10
+      m: 4.303900000000e-01
+      mx: -3.264753807621e-06
+      my: 1.510972114700e-04
+      mz: -1.092522939384e-02
+      Ixx: 7.504452327572e-04
+      Ixy: 1.343830598891e-07
+      Ixz: -1.173473302455e-06
+      Iyy: 7.511107599860e-04
+      Iyz: 1.164392250103e-06
+      Izz: 2.760529505442e-04
   - name: "right_arm_link5"
     inertial_params:
-      m: null
-      mx: null
-      my: null
-      mz: null
-      Ixx: null
-      Ixy: null
-      Ixz: null
-      Iyy: null
-      Iyz: null
-      Izz: null
-  # ========== regressor body 5: right_arm_link6 ==========
-  # 不可辨识: 0/10, 可辨识: 10/10
+      m: 8.096900000000e-01
+      mx: 7.409285576682e-04
+      my: 1.485755780178e-05
+      mz: -6.084579733168e-02
+      Ixx: 6.401692635798e-03
+      Ixy: 9.238983253372e-07
+      Ixz: 9.241571249378e-05
+      Iyy: 6.407568755252e-03
+      Iyz: -5.105162944314e-07
+      Izz: 5.615481898266e-04
   - name: "right_arm_link6"
     inertial_params:
-      m: null
-      mx: null
-      my: null
-      mz: null
-      Ixx: null
-      Ixy: null
-      Ixz: null
-      Iyy: null
-      Iyz: null
-      Izz: null
-  # ========== regressor body 6: right_arm_link7 ==========
-  # 不可辨识: 1/10, 可辨识: 9/10
+      m: 3.146600000000e-01
+      mx: 5.646870865942e-05
+      my: 3.148393033529e-04
+      mz: -7.788595201474e-06
+      Ixx: 1.212106652824e-04
+      Ixy: 1.820583176546e-07
+      Ixz: -7.034954926925e-08
+      Iyy: 1.367247081966e-04
+      Iyz: 2.661595656516e-07
+      Izz: 1.378208965659e-04
   - name: "right_arm_link7"
     inertial_params:
-      m: 7.31110000e-01
-      mx: null
-      my: null
-      mz: null
-      Ixx: null
-      Ixy: null
-      Ixz: null
-      Iyy: null
-      Iyz: null
-      Izz: null
+      m: 7.311100000000e-01
+      mx: -2.499489834369e-03
+      my: -1.940108169102e-03
+      mz: -1.748810668750e-02
+      Ixx: 9.158840095548e-04
+      Ixy: -3.265141005181e-05
+      Ixz: -6.618365217873e-05
+      Iyy: 8.963528705975e-04
+      Iyz: -6.573824326049e-05
+      Izz: 2.739974552297e-04

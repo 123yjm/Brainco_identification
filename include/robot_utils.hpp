@@ -25,6 +25,12 @@ std::string resultInertiaPath(const std::string& robot_dir, const std::string& f
 /// 摩擦力辨识 — 拼接结果路径: <robot_dir>/result_friction/<filename>
 std::string resultFrictionPath(const std::string& robot_dir, const std::string& filename);
 
+/// 最小惯性参数 — 采集数据: <robot_dir>/data_base_inertia/<filename>
+std::string dataBaseInertiaPath(const std::string& robot_dir, const std::string& filename);
+
+/// 最小惯性参数 — 结果: <robot_dir>/result_base_inertia/<filename>
+std::string resultBaseInertiaPath(const std::string& robot_dir, const std::string& filename);
+
 /// 其他输出: <robot_dir>/result_others/<filename>
 std::string resultOthersPath(const std::string& robot_dir, const std::string& filename);
 

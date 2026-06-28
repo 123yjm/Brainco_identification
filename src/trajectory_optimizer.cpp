@@ -5,6 +5,8 @@
 
 #include "trajectory_optimizer.hpp"
 #include "regressor_factory.hpp"
+#include "serial_arm_regressor.hpp"
+#include "fast_regressor.hpp"
 
 #include <nlopt.hpp>
 
@@ -227,14 +229,30 @@ ExcitationTrajectoryOptimizer::ExcitationTrajectoryOptimizer(
     throw std::runtime_error("无法创建机器人回归器: " + robot_name);
   }
 
-  auto flags = robot_dynamics::ParamFlags::ALL;
-  num_params_ = static_cast<int>(regressor_->numParameters(flags));
+  // 初始化快速回归器缓存 (用于优化目标评估)
+  auto *sar = dynamic_cast<robot_dynamics::SerialArmRegressor*>(regressor_.get());
+  if (sar) {
+    robot_dynamics::initFastRegressor(*sar);
+    std::cout << "  回归器: fast (sin/cos + geometric Jacobian)" << std::endl;
+  }
+
+  num_params_ = static_cast<int>(regressor_->numParameters(cfg_.param_flags));
 
   std::cout << "激励轨迹优化初始化:" << std::endl;
   std::cout << "  机器人: " << robot_name << std::endl;
   std::cout << "  DOF: " << dof_ << std::endl;
   std::cout << "  参数数: " << num_params_ << std::endl;
   std::cout << "  优化变量数: " << n_vars_ << std::endl;
+  std::cout << "  目标函数: ";
+  switch (cfg_.objective_type) {
+    case ExcitationObjectiveType::D_OPTIMAL: std::cout << "D-optimal (-log(det))"; break;
+    case ExcitationObjectiveType::COND_W_BASE: std::cout << "cond(W_base)"; break;
+    case ExcitationObjectiveType::HYBRID:
+      std::cout << "hybrid (cond_w=" << cfg_.cond_weight
+                << ", dopt_w=" << cfg_.dopt_weight << ")"; break;
+  }
+  std::cout << "\n  ParamFlags: " << (cfg_.param_flags == robot_dynamics::ParamFlags::NONE ? "NONE" :
+      cfg_.param_flags == robot_dynamics::ParamFlags::ALL ? "ALL" : "custom") << std::endl;
   std::cout << "  傅里叶阶数: " << cfg_.fourier_order << std::endl;
   std::cout << "  运行时长: " << cfg_.sampling_time
             << " s,  wf: " << cfg_.wf << " rad/s" << std::endl;
@@ -275,30 +293,68 @@ ExcitationTrajectoryOptimizer::computeObjective(const Eigen::VectorXd &x) const 
     Qdd.col(k) = qdd_tmp;
   }
 
-  // 3. 通过 regressor 构建堆叠观测矩阵 W
-  auto flags = robot_dynamics::ParamFlags::ALL;
+  // 3. 构建观测矩阵 W (使用原始 FK 回归器, 与辨识管线一致)
   Eigen::MatrixXd W =
-      regressor_->computeObservationMatrix(Q, Qd, Qdd, flags);
+      regressor_->computeObservationMatrix(Q, Qd, Qdd, cfg_.param_flags);
 
-  // 4. D-最优准则: max det(W^T W)  ⇔  min -log(det(W^T W))
-  //    使用特征值对数之和避免数值溢出
-  Eigen::MatrixXd WtW = W.transpose() * W;
+  // 4. 根据目标类型计算目标值
+  switch (cfg_.objective_type) {
 
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigs(WtW);
-  if (eigs.info() != Eigen::Success) {
-    return 1e10; // 数值问题时返回大值
+  case ExcitationObjectiveType::D_OPTIMAL: {
+    // D-最优准则: max det(W^T W)  ⇔  min -log(det(W^T W))
+    Eigen::MatrixXd WtW = W.transpose() * W;
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigs(WtW);
+    if (eigs.info() != Eigen::Success) return 1e10;
+    const Eigen::VectorXd &evals = eigs.eigenvalues();
+    double sum_log = 0.0;
+    for (Eigen::Index i = 0; i < evals.size(); ++i)
+      sum_log += std::log(std::max(evals(i), 1e-12));
+    return -sum_log;
   }
 
-  const Eigen::VectorXd &evals = eigs.eigenvalues();
-
-  // 极小特征值截断，避免 log(0) 或 log(负)
-  double sum_log = 0.0;
-  for (Eigen::Index i = 0; i < evals.size(); ++i) {
-    double ev = std::max(evals(i), 1e-12);
-    sum_log += std::log(ev);
+  case ExcitationObjectiveType::COND_W_BASE: {
+    // 特征值条件数: λ_max / λ_min_pos
+    // 阈值使用固定缩放 (不依赖行数), 保证与辨识一致
+    Eigen::MatrixXd WtW = W.transpose() * W;
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigs(WtW);
+    if (eigs.info() != Eigen::Success) return 1e10;
+    const Eigen::VectorXd &evals = eigs.eigenvalues();
+    double lambda_max = evals(evals.size() - 1);
+    // 固定阈值: 不依赖行数, 仅依赖最大特征值
+    double threshold = 1e-12 * lambda_max;
+    double lambda_min = lambda_max;
+    for (Eigen::Index i = 0; i < evals.size(); ++i) {
+      if (evals(i) > threshold) { lambda_min = evals(i); break; }
+    }
+    if (lambda_min <= 0.0) return 1e10;
+    return lambda_max / lambda_min;
   }
 
-  return -sum_log; // 最小化负的对数行列式
+  case ExcitationObjectiveType::HYBRID: {
+    // cond 项: QRCP
+    double cond_term = 1e10;
+    try {
+      auto dec = robot_dynamics::BaseParameterDecomposition::compute(W, cfg_.qrcp_tol);
+      cond_term = dec.cond_R1;
+    } catch (...) {}
+
+    // D-optimal 项
+    Eigen::MatrixXd WtW = W.transpose() * W;
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigs2(WtW);
+    double dopt_term = 1e10;
+    if (eigs2.info() == Eigen::Success) {
+      double sum_log = 0.0;
+      const Eigen::VectorXd &ev2 = eigs2.eigenvalues();
+      for (Eigen::Index i = 0; i < ev2.size(); ++i)
+        sum_log += std::log(std::max(ev2(i), 1e-12));
+      dopt_term = -sum_log;
+    }
+
+    return cfg_.cond_weight * cond_term + cfg_.dopt_weight * dopt_term;
+  }
+
+  } // switch
+  return 1e10;
 }
 
 // ---------------------------------------------------------------------------
@@ -476,23 +532,63 @@ ExcitationTrajectoryOptimizer::runSingle(const Eigen::VectorXd &x0,
   auto params = FourierTrajectoryParams::fromVector(x_final, dof_,
                                                      cfg_.fourier_order,
                                                      cfg_.wf);
-  double cond_num = computeObjective(x_final);
 
   // 生成轨迹 — 用 trajectory_frequency 直接由傅里叶参数求值
   const int K_out =
       static_cast<int>(cfg_.sampling_time * cfg_.trajectory_frequency) + 1;
   const double dt_out = 1.0 / cfg_.trajectory_frequency;
 
+  // 构建 W 用于计算 log_det 和 cond_W_base (报告用, 不论优化目标)
+  const int K_eval = cfg_.num_timesteps;
+  const double dt_eval = cfg_.sampling_time / static_cast<double>(K_eval - 1);
+  Eigen::MatrixXd Q_eval(dof_, K_eval);
+  Eigen::MatrixXd Qd_eval(dof_, K_eval);
+  Eigen::MatrixXd Qdd_eval(dof_, K_eval);
+  Eigen::VectorXd q_tmp(dof_), qd_tmp(dof_), qdd_tmp(dof_);
+  for (int k = 0; k < K_eval; ++k) {
+    double t = static_cast<double>(k) * dt_eval;
+    params.evaluateAll(t, q_tmp, qd_tmp, qdd_tmp);
+    Q_eval.col(k) = q_tmp;
+    Qd_eval.col(k) = qd_tmp;
+    Qdd_eval.col(k) = qdd_tmp;
+  }
+  Eigen::MatrixXd W_report =
+      regressor_->computeObservationMatrix(Q_eval, Qd_eval, Qdd_eval, cfg_.param_flags);
+
+  // log_det
+  double log_det_val = 0.0;
+  {
+    Eigen::MatrixXd WtW = W_report.transpose() * W_report;
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigs(WtW);
+    if (eigs.info() == Eigen::Success) {
+      double sum_log = 0.0;
+      const Eigen::VectorXd &evals = eigs.eigenvalues();
+      for (Eigen::Index i = 0; i < evals.size(); ++i)
+        sum_log += std::log(std::max(evals(i), 1e-12));
+      log_det_val = -sum_log;
+    }
+  }
+
+  // cond_W_base
+  double cond_base = 1e10;
+  int wb_rank = 0;
+  try {
+    auto dec = robot_dynamics::BaseParameterDecomposition::compute(W_report, cfg_.qrcp_tol);
+    cond_base = dec.cond_R1;
+    wb_rank = static_cast<int>(dec.rank);
+  } catch (...) {}
+
   ExcitationTrajectoryResult res;
   res.params = params;
-  res.log_det = cond_num; // 此时 cond_num 存储的是 -log(det(W^T W))
+  res.log_det = log_det_val;
+  res.cond_W_base = cond_base;
+  res.W_base_rank = wb_rank;
   res.objective_value = min_f;
   res.time.resize(K_out);
   res.q_trajectory.resize(K_out, dof_);
   res.qd_trajectory.resize(K_out, dof_);
   res.qdd_trajectory.resize(K_out, dof_);
 
-  Eigen::VectorXd q_tmp(dof_), qd_tmp(dof_), qdd_tmp(dof_);
   for (int k = 0; k < K_out; ++k) {
     double t = static_cast<double>(k) * dt_out;
     res.time[k] = t;
@@ -502,10 +598,14 @@ ExcitationTrajectoryOptimizer::runSingle(const Eigen::VectorXd &x0,
     res.qdd_trajectory.row(k) = qdd_tmp.transpose();
   }
 
-  std::cout << "  起点 " << restart_index + 1 << ": -log(det)="
-            << std::setprecision(4) << cond_num << "  (COBYLA: "
-            << phase1_evals << " + SLSQP: " << phase2_evals
-            << " 次评估)" << std::endl;
+  std::cout << "  起点 " << restart_index + 1 << ": f="
+            << std::scientific << std::setprecision(2) << min_f
+            << ", log_det=" << std::setprecision(3) << log_det_val
+            << ", cond(W_base)=" << std::setprecision(2) << cond_base
+            << " (rank=" << wb_rank << ")"
+            << "\n    COBYLA: " << phase1_evals << " + SLSQP: "
+            << phase2_evals << " 次评估" << std::endl;
+  std::cout << std::fixed;
 
   return res;
 }
@@ -544,7 +644,10 @@ ExcitationTrajectoryResult ExcitationTrajectoryOptimizer::optimize() {
   }
 
   std::cout << "\n===== 优化完成 =====" << std::endl;
-  std::cout << "最优 D-最优值 (-log det): " << best.log_det << std::endl;
+  std::cout << "最优目标值: " << best.objective_value << std::endl;
+  std::cout << "log_det(W^T W): " << best.log_det << std::endl;
+  std::cout << "cond(W_base): " << best.cond_W_base
+            << "  (rank=" << best.W_base_rank << ")" << std::endl;
 
   // 验证约束
   Eigen::VectorXd q0(dof_), qd0(dof_), qdd0(dof_);
@@ -679,6 +782,31 @@ loadExciteTrajectoryConfig(const std::string &path) {
     cfg.max_iterations = root["max_iterations"].as<int>();
   if (root["ftol_rel"])
     cfg.ftol_rel = root["ftol_rel"].as<double>();
+
+  // ---- 目标函数配置 (可选，默认 D_OPTIMAL 向后兼容) ----
+  if (root["objective_type"]) {
+    std::string s = root["objective_type"].as<std::string>();
+    if (s == "d_optimal" || s == "dopt")
+      cfg.objective_type = ExcitationObjectiveType::D_OPTIMAL;
+    else if (s == "cond_w_base" || s == "cond")
+      cfg.objective_type = ExcitationObjectiveType::COND_W_BASE;
+    else if (s == "hybrid")
+      cfg.objective_type = ExcitationObjectiveType::HYBRID;
+    else
+      throw std::runtime_error("excite_trajectory.yaml: unknown objective_type '" + s + "'");
+  }
+  if (root["param_flags"]) {
+    std::string s = root["param_flags"].as<std::string>();
+    if (s == "none" || s == "inertia")
+      cfg.param_flags = robot_dynamics::ParamFlags::NONE;
+    else if (s == "all")
+      cfg.param_flags = robot_dynamics::ParamFlags::ALL;
+    else
+      throw std::runtime_error("excite_trajectory.yaml: unknown param_flags '" + s + "'");
+  }
+  if (root["cond_weight"])   cfg.cond_weight   = root["cond_weight"].as<double>();
+  if (root["dopt_weight"])   cfg.dopt_weight   = root["dopt_weight"].as<double>();
+  if (root["qrcp_tol"])      cfg.qrcp_tol      = root["qrcp_tol"].as<double>();
 
   return cfg;
 }

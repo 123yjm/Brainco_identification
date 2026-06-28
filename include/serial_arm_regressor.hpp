@@ -23,6 +23,12 @@ public:
   /// 用于辨识的刚体数量（不含 kinematic prefix）
   std::size_t nBodies() const override { return n_bodies_; }
 
+  /// kinematic prefix 数量
+  std::size_t kinematicPrefix() const { return kinematic_prefix_; }
+
+  /// 全部刚体 (含 kinematic prefix)
+  const std::vector<RigidBody> &getBodies() const { return bodies_; }
+
   VectorXd
   computeParameterVector(ParamFlags flags = ParamFlags::ALL) const override;
 

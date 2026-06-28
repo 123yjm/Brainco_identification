@@ -74,7 +74,7 @@ public:
   //             threshold = tol * ε * max(m,n) * abs(R(0,0))
   //             增大 tol → 更保守 → 更多列被判为不可辨识
   // @return    Decomposition 结构体
-  static Decomposition compute(const MatrixXd &W, double tol = 1.0);
+  static Decomposition compute(const MatrixXd &W, double tol = 100.0);
 
   // --------------------------------------------------------------------------
   // getBaseRegressor — 提取列满秩的基回归矩阵
@@ -88,11 +88,22 @@ public:
   // baseToFull — 最小参数集映射回全参数空间（最小范数解）
   // --------------------------------------------------------------------------
   // 令 β₂ = 0（不可辨识参数设为零），则:
-  //   β₁ = R₁⁻¹·β_base
+  //   β₁ = β_base
   //   β_full = E · [β₁; 0]
   // 这给出满足 τ = W·β_full 的最小 ||β|| 解
   static VectorXd baseToFull(const VectorXd &beta_base,
                              const Decomposition &decomp);
+
+  // --------------------------------------------------------------------------
+  // baseToFullWithPrior — 用先验值填充不可辨识参数，从数据求解可辨识参数
+  // --------------------------------------------------------------------------
+  // β_base = p₁ + α·p₂  (已知 β_base 和 p₂ = E^T·β_prior 的不可辨识部分)
+  // → p₁ = β_base - α·p₂
+  // → β_full = E · [p₁; p₂]
+  // 可辨识参数由数据决定，不可辨识参数保持先验值
+  static VectorXd baseToFullWithPrior(const VectorXd &beta_base,
+                                      const VectorXd &beta_prior_full,
+                                      const Decomposition &decomp);
 
   // --------------------------------------------------------------------------
   // getNullVector — 生成零空间向量

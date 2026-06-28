@@ -12,6 +12,7 @@
  * 使用 NLopt SLSQP 求解约束非线性规划，多起点随机初始化。
  */
 
+#include "base_parameter.hpp"
 #include "dynamics_regressor.hpp"
 
 #include <Eigen/Core>
@@ -24,6 +25,16 @@
 #include <vector>
 
 namespace excitation_trajectory {
+
+// ============================================================================
+// ExcitationObjectiveType — 激励轨迹优化目标类型
+// ============================================================================
+
+enum class ExcitationObjectiveType : int {
+  D_OPTIMAL = 0,  ///< min -log(det(W^T W))          — 最大化信息量
+  COND_W_BASE,    ///< min cond(W_base)               — 最小化基回归条件数
+  HYBRID          ///< min w1*cond + w2*(-logdet)     — 混合目标
+};
 
 // ============================================================================
 // FourierJointParams — 单关节傅里叶级数参数 (5 阶)
@@ -147,6 +158,13 @@ struct ExcitationTrajectoryConfig {
   int multi_start_count = 8;
   int max_iterations = 15000;
   double ftol_rel = 1e-10;
+
+  // ---- 目标函数配置 (可选, 默认 D_OPTIMAL 向后兼容) ----
+  ExcitationObjectiveType objective_type = ExcitationObjectiveType::D_OPTIMAL;
+  robot_dynamics::ParamFlags param_flags = robot_dynamics::ParamFlags::ALL;
+  double cond_weight = 1.0;   ///< cond 权重 (仅 hybrid 模式)
+  double dopt_weight = 1.0;   ///< D-optimal 权重 (仅 hybrid 模式)
+  double qrcp_tol = 100.0;    ///< QRCP 秩判定阈值乘数
 };
 
 // ============================================================================
@@ -155,8 +173,10 @@ struct ExcitationTrajectoryConfig {
 
 struct ExcitationTrajectoryResult {
   FourierTrajectoryParams params;
-  double log_det = 0.0;       ///< -log(det(W^T W))
+  double log_det = 0.0;        ///< -log(det(W^T W))
   double objective_value = 0.0;
+  double cond_W_base = 0.0;    ///< cond(R1) from base-parameter QRCP
+  int W_base_rank = 0;         ///< numerical rank of W_base
 
   /// 最优轨迹 (K × dof 行优先，每行一个采样点)
   Eigen::MatrixXd q_trajectory;

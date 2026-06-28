@@ -27,11 +27,21 @@ BaseParameterDecomposition::compute(const MatrixXd &W, double tol) {
         std::to_string(m) + "x" + std::to_string(n) + ")");
   }
 
-  // ---- QR 列主元分解 --------------------------------------------------------
-  Eigen::ColPivHouseholderQR<MatrixXd> qr(W);
+  // ---- 列缩放 (参考 robotdynid: 每列除以 L2 范数, 消除量纲差异) ---------------
+  Eigen::VectorXd scales(n);
+  for (Eigen::Index j = 0; j < n; ++j) {
+    double norm = W.col(j).norm();
+    scales(j) = (norm > 0.0) ? norm : 1.0;
+  }
+  MatrixXd W_scaled = W;
+  for (Eigen::Index j = 0; j < n; ++j) {
+    W_scaled.col(j) /= scales(j);
+  }
+
+  // ---- QR 列主元分解 (在缩放后的矩阵上) ----------------------------------------
+  Eigen::ColPivHouseholderQR<MatrixXd> qr(W_scaled);
 
   // R_raw 是 m×n，只有 top-left min(m,n)×n 部分有意义
-  // 取前 n 行（因为 m >> n 在本项目中）
   Eigen::Index n_rows = std::min(m, n);
   MatrixXd R_raw = qr.matrixR().topRows(n_rows);
 
@@ -63,20 +73,37 @@ BaseParameterDecomposition::compute(const MatrixXd &W, double tol) {
   Eigen::Index deficiency = n - rank;
 
   // ---- 提取 R1 & R2 ---------------------------------------------------------
-  // R1 = R(0:rank-1, 0:rank-1)  上三角方阵
-  // R2 = R(0:rank-1, rank:n-1)  取自前 rank 行的右侧部分
   MatrixXd R1 = R_raw.topLeftCorner(rank, rank).template triangularView<Eigen::Upper>();
   MatrixXd R2 = R_raw.block(0, rank, rank, deficiency);
 
-  // ---- α = R1^{-1} * R2 -----------------------------------------------------
-  // 利用上三角结构回代，O(r²·(n-r))
+  // ---- α_scaled = R1^{-1} * R2 (缩放空间中的依赖矩阵) ------------------------
+  MatrixXd alpha_scaled = MatrixXd::Zero(rank, deficiency);
+  if (deficiency > 0) {
+    alpha_scaled = R1.template triangularView<Eigen::Upper>().solve(R2);
+  }
+
+  // ---- 反缩放: α = diag(1/s_keep) · α_scaled · diag(s_dep) ---------------
+  //   Y_dep / s_dep = (Y_keep / s_keep) · α_scaled
+  //   → Y_dep = Y_keep · diag(1/s_keep) · α_scaled · diag(s_dep)
+  //   → α_unscaled(i,j) = α_scaled(i,j) * s_dep(j) / s_keep(i)
   MatrixXd alpha = MatrixXd::Zero(rank, deficiency);
   if (deficiency > 0) {
-    alpha = R1.template triangularView<Eigen::Upper>().solve(R2);
+    // 先提取 keep/dep 对应的缩放因子
+    Eigen::VectorXd s_keep(rank), s_dep(deficiency);
+    const int *piv = qr.colsPermutation().indices().data();
+    for (Eigen::Index i = 0; i < rank; ++i)
+      s_keep(i) = scales(static_cast<Eigen::Index>(piv[i]));
+    for (Eigen::Index j = 0; j < deficiency; ++j)
+      s_dep(j) = scales(static_cast<Eigen::Index>(piv[rank + j]));
+
+    for (Eigen::Index i = 0; i < rank; ++i) {
+      for (Eigen::Index j = 0; j < deficiency; ++j) {
+        alpha(i, j) = alpha_scaled(i, j) * s_dep(j) / s_keep(i);
+      }
+    }
   }
 
   // ---- 条件数估计 -----------------------------------------------------------
-  // 用 |R 对角线| 的最大/最小比近似 R1 的条件数
   double cond_R1 = R_diag(0) / R_diag(rank - 1);
 
   // ---- 置换信息 -------------------------------------------------------------
@@ -103,10 +130,12 @@ BaseParameterDecomposition::compute(const MatrixXd &W, double tol) {
   dec.identifiable_indices = std::move(identifiable);
   dec.unidentifiable_indices = std::move(unidentifiable);
 
+#ifdef IDENTIFICATION_VERBOSE
   std::cout << "[BaseParameterDecomposition] QRCP: " << m << "×" << n
             << " → rank=" << rank << ", deficiency=" << deficiency
             << ", cond(R1)=" << cond_R1
             << ", threshold=" << threshold << "\n";
+#endif
 
   return dec;
 }
@@ -156,6 +185,46 @@ BaseParameterDecomposition::baseToFull(const VectorXd &beta_base,
   const int *indices_btf = decomp.E.indices().data();
   for (Eigen::Index k = 0; k < n; ++k) {
     beta_full(static_cast<Eigen::Index>(indices_btf[k])) = beta_permuted(k);
+  }
+
+  return beta_full;
+}
+
+// ============================================================================
+// baseToFullWithPrior — 用先验值填充不可辨识参数，从数据求解可辨识参数
+// ============================================================================
+
+BaseParameterDecomposition::VectorXd
+BaseParameterDecomposition::baseToFullWithPrior(const VectorXd &beta_base,
+                                                 const VectorXd &beta_prior_full,
+                                                 const Decomposition &decomp) {
+  const Eigen::Index n = decomp.n_full;
+  const Eigen::Index r = decomp.rank;
+  const Eigen::Index d = n - r;
+
+  // p_prior = E^T · β_prior_full  →  p_prior[k] = β_prior_full[indices[k]]
+  const int *indices = decomp.E.indices().data();
+  VectorXd p_prior(n);
+  for (Eigen::Index k = 0; k < n; ++k) {
+    p_prior(k) = beta_prior_full(static_cast<Eigen::Index>(indices[k]));
+  }
+
+  // 不可辨识部分的先验值: p₂ = p_prior[r:n]
+  VectorXd p2 = p_prior.tail(d);
+
+  // 从 β_base = p₁ + α·p₂ 反解可辨识部分: p₁ = β_base - α·p₂
+  VectorXd p1 = beta_base;
+  if (d > 0) {
+    p1 -= decomp.alpha * p2;
+  }
+
+  // β_full = E · [p₁; p₂]
+  VectorXd p_combined(n);
+  p_combined << p1, p2;
+
+  VectorXd beta_full = VectorXd::Zero(n);
+  for (Eigen::Index k = 0; k < n; ++k) {
+    beta_full(static_cast<Eigen::Index>(indices[k])) = p_combined(k);
   }
 
   return beta_full;
