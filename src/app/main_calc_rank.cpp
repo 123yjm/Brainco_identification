@@ -43,8 +43,6 @@ void printHelp(const char* prog) {
         << "用法: " << prog << " --robot <robot_dir> [选项]\n\n"
         << "选项:\n"
         << "  --robot <dir>         机器人目录 (如 robots/revoarm_right)\n"
-        << "  --armature            启用 armature 列\n"
-        << "  --no-armature         禁用 armature 列\n"
         << "  --damping             启用 damping 列\n"
         << "  --no-damping          禁用 damping 列\n"
         << "  --no-cross-inertia    剔除每个 body 的 Ixy/Ixz/Iyz 列\n"
@@ -52,7 +50,7 @@ void printHelp(const char* prog) {
         << "  --tol <value>         秩判定阈值乘数 (默认 1.0)\n"
         << "                          秩阈值 = tol * eps * max(m,n) * sigma_max\n"
         << "  --help                打印帮助信息\n\n"
-        << "若未指定 armature/damping，默认从 inertia_identification.yaml 读取。\n";
+        << "若未指定 damping，默认从 inertia_identification.yaml 读取。\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -60,8 +58,6 @@ void printHelp(const char* prog) {
 // ---------------------------------------------------------------------------
 struct Options {
     std::string robot_dir;
-    bool armature_set = false;
-    bool armature = true;
     bool damping_set = false;
     bool damping = true;
     bool no_cross_inertia = false;
@@ -101,13 +97,6 @@ buildColumnMask(const Options& opt, std::size_t n_bodies, std::size_t n_dof,
     }
 
     Eigen::Index next_offset = static_cast<Eigen::Index>(n_bodies * PPB);
-
-    // armature
-    if (hasFlag(flags, ParamFlags::ARMATURE)) {
-        for (Eigen::Index j = 0; j < static_cast<Eigen::Index>(n_dof); ++j)
-            keep.push_back(next_offset + j);
-        next_offset += static_cast<Eigen::Index>(n_dof);
-    }
 
     // damping
     if (hasFlag(flags, ParamFlags::DAMPING)) {
@@ -164,8 +153,6 @@ int main(int argc, char* argv[]) {
     // ---- 读取 inertia_identification.yaml 默认值 --------------------------
     try {
         auto iroot = YAML::LoadFile(id_yaml);
-        if (!opt.armature_set && iroot["armature"])
-            opt.armature = iroot["armature"].as<bool>();
         if (!opt.damping_set && iroot["damping"])
             opt.damping = iroot["damping"].as<bool>();
     } catch (...) {}
@@ -173,13 +160,7 @@ int main(int argc, char* argv[]) {
     // ---- 第二次扫描：CLI 覆盖 -----------------------------------------------
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
-        if (arg == "--armature") {
-            opt.armature = true;
-            opt.armature_set = true;
-        } else if (arg == "--no-armature") {
-            opt.armature = false;
-            opt.armature_set = true;
-        } else if (arg == "--damping") {
+        if (arg == "--damping") {
             opt.damping = true;
             opt.damping_set = true;
         } else if (arg == "--no-damping") {
@@ -211,7 +192,6 @@ int main(int argc, char* argv[]) {
 
     // ---- 设置 ParamFlags ---------------------------------------------------
     auto flags = robot_dynamics::ParamFlags::NONE;
-    if (opt.armature) flags = flags | robot_dynamics::ParamFlags::ARMATURE;
     if (opt.damping)  flags = flags | robot_dynamics::ParamFlags::DAMPING;
 
     const std::size_t n_dof = regressor->nDof();
@@ -227,7 +207,6 @@ int main(int argc, char* argv[]) {
               << "  Bodies:          " << n_bodies
               << "  (每 body " << (opt.no_cross_inertia ? 7 : 10) << " 列)\n"
               << "  Cross-inertia:   " << (opt.no_cross_inertia ? "OFF (剔除 Ixy/Ixz/Iyz)" : "ON" ) << "\n"
-              << "  Armature:        " << (opt.armature ? "ON  (+" + std::to_string(n_dof) + ")" : "OFF") << "\n"
               << "  Damping:         " << (opt.damping  ? "ON  (+" + std::to_string(n_dof) + ")" : "OFF") << "\n"
               << "  全参数列数:      " << num_params_full << "\n"
               << "  有效列数 (裁剪后): " << n_cols_reduced << std::endl;

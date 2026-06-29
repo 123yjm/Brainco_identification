@@ -56,11 +56,15 @@ int main(int argc, char* argv[]) {
     if (passband_override > 0) cfg.passband_hz = passband_override;
     if (stopband_override > 0) cfg.stopband_hz = stopband_override;
 
-    std::string input_txt = robot_utils::findFirstFile(
-        robot_utils::dataInertiaPath(robot_dir, ""), "*.txt");
-    if (input_txt.empty()) {
+    std::string input_file = robot_utils::findFirstFile(
+        robot_utils::dataInertiaPath(robot_dir, ""), "*.csv");
+    if (input_file.empty()) {
+        input_file = robot_utils::findFirstFile(
+            robot_utils::dataInertiaPath(robot_dir, ""), "*.txt");
+    }
+    if (input_file.empty()) {
         std::cerr << "错误: 在 " << robot_utils::dataInertiaPath(robot_dir, "")
-                  << " 下未找到 .txt 文件\n";
+                  << " 下未找到 .csv 或 .txt 文件\n";
         return 1;
     }
 
@@ -72,7 +76,7 @@ int main(int argc, char* argv[]) {
               << "  Butterworth 滤波器 — 数据预处理\n"
               << "═══════════════════════════════════════════\n"
               << "机器人:       " << robot_name << "\n"
-              << "输入:         " << input_txt << "\n"
+              << "输入:         " << input_file << "\n"
               << "输出:         " << output_csv << "\n"
               << "通带:         " << cfg.passband_hz << " Hz\n"
               << "阻带:         " << cfg.stopband_hz << " Hz\n"
@@ -81,7 +85,7 @@ int main(int argc, char* argv[]) {
     // ---- 3. 读取原始数据 --------------------------------------------------
     signal_processing::RawMeasurementData raw;
     try {
-        raw = signal_processing::readRawTxt(input_txt);
+        raw = signal_processing::readRawTxt(input_file);
     } catch (const std::exception& e) {
         std::cerr << "错误: " << e.what() << std::endl;
         return 1;

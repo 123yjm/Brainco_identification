@@ -26,6 +26,11 @@ add_executable(identify_inertia src/app/main_solve_inertia.cpp)
 target_compile_definitions(identify_inertia PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(identify_inertia PRIVATE brainco_id_core)
 
+# ---- PC 惯量辨识 ----
+add_executable(identify_inertia_PC src/app/main_solve_inertia_PC.cpp)
+target_compile_definitions(identify_inertia_PC PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(identify_inertia_PC PRIVATE brainco_id_core)
+
 # ---- 重力分离 ----
 add_executable(remove_gravity src/app/main_remove_gravity.cpp)
 target_compile_definitions(remove_gravity PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
@@ -77,6 +82,6 @@ target_compile_definitions(filter_data PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_
 target_link_libraries(filter_data PRIVATE brainco_id_filter)
 
 # ---- 滤波 + 辨识一站式入口（无中间 CSV 落盘）----
-add_executable(filter_and_solve src/app/main_filter_and_solve.cpp)
-target_compile_definitions(filter_and_solve PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
-target_link_libraries(filter_and_solve PRIVATE brainco_id_filter brainco_id_core)
+add_executable(filter_and_solve_inertia src/app/main_filter_and_solve_inertia.cpp)
+target_compile_definitions(filter_and_solve_inertia PRIVATE PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(filter_and_solve_inertia PRIVATE brainco_id_filter brainco_id_core)

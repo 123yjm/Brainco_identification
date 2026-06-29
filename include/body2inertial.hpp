@@ -15,8 +15,7 @@ namespace robot_dynamics {
 enum class ParamFlags : unsigned int {
   NONE = 0,
   DAMPING = 1 << 0,   ///< 粘性阻尼 (符号为负)
-  ARMATURE = 1 << 1,  ///< 电机转子反映惯量
-  ALL = DAMPING | ARMATURE
+  ALL = DAMPING
 };
 
 inline ParamFlags operator|(ParamFlags a, ParamFlags b) {

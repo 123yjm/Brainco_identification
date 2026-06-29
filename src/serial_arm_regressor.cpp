@@ -170,9 +170,6 @@ std::size_t
 SerialArmRegressor::numParameters(ParamFlags flags) const {
   std::size_t params = n_bodies_ * InertialParams::PARAMS_PER_BODY;
 
-  if (hasFlag(flags, ParamFlags::ARMATURE)) {
-    params += n_dof_;
-  }
 
   if (hasFlag(flags, ParamFlags::DAMPING)) {
     params += n_dof_;
@@ -194,7 +191,6 @@ SerialArmRegressor::computeParameterVector(ParamFlags flags) const {
     theta.segment(offset, InertialParams::PARAMS_PER_BODY) = sip_vec;
   }
 
-  // armature 无物理先验，填 0（theta 已初始化为零）
   // damping 无物理先验，填 0（theta 已初始化为零）
   (void)flags; // 仅当未来需要从 bodies_ 读取先验值时使用
 
@@ -212,12 +208,6 @@ SerialArmRegressor::getParameterNames(ParamFlags flags) const {
     std::size_t body_idx = i + kinematic_prefix_;
     for (int j = 0; j < 10; ++j) {
       names.push_back(bodies_[body_idx].name + "_" + param_names[j]);
-    }
-  }
-
-  if (hasFlag(flags, ParamFlags::ARMATURE)) {
-    for (std::size_t i = 0; i < n_dof_; ++i) {
-      names.push_back("armature_" + std::to_string(i + 1));
     }
   }
 
@@ -358,18 +348,8 @@ SerialArmRegressor::computeRegressorMatrix(
     Y.block(0, offset, n_dof_, InertialParams::PARAMS_PER_BODY) = Y_body;
   }
 
-  if (hasFlag(flags, ParamFlags::ARMATURE)) {
-    std::size_t current_offset = n_bodies_ * InertialParams::PARAMS_PER_BODY;
-    for (std::size_t i = 0; i < n_dof_; ++i) {
-      Y(i, current_offset + i) = qdd(i);
-    }
-  }
-
   if (hasFlag(flags, ParamFlags::DAMPING)) {
     std::size_t current_offset = n_bodies_ * InertialParams::PARAMS_PER_BODY;
-    if (hasFlag(flags, ParamFlags::ARMATURE)) {
-      current_offset += n_dof_;
-    }
     for (std::size_t i = 0; i < n_dof_; ++i) {
       Y(i, current_offset + i) = -qd(i);
     }

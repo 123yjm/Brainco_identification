@@ -25,6 +25,9 @@ std::string resultInertiaPath(const std::string& robot_dir, const std::string& f
 /// 摩擦力辨识 — 拼接结果路径: <robot_dir>/result_friction/<filename>
 std::string resultFrictionPath(const std::string& robot_dir, const std::string& filename);
 
+/// PC 惯量辨识 — 拼接结果路径: <robot_dir>/result_inertia_PC/<filename>
+std::string resultInertiaPCPath(const std::string& robot_dir, const std::string& filename);
+
 /// 其他输出: <robot_dir>/result_others/<filename>
 std::string resultOthersPath(const std::string& robot_dir, const std::string& filename);
 
