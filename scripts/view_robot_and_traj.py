@@ -23,9 +23,7 @@ import mujoco.viewer
 from view_robot import (
     load_kinematic_params,
     _resolve_robot_dir,
-    _ensure_defaults,
-    _compute_capsule_for_body,
-    _build_chain_xml,
+    build_mjcf_xml,
 )
 
 
@@ -67,59 +65,6 @@ def load_trajectory_csv(robot_name: str) -> tuple:
 
 
 # ===========================================================================
-# 带执行器的 MJCF XML 构建
-# ===========================================================================
-
-def _collect_joint_bodies(bodies: list) -> list:
-    """收集所有带关节的 body 名称。"""
-    joint_names = []
-    for b in bodies:
-        if b.get("has_joint"):
-            joint_names.append(b["name"])
-    return joint_names
-
-
-def build_mjcf_xml_with_actuators(params: dict, robot_name: str) -> str:
-    """构建带 position 执行器的 MJCF XML 字符串。"""
-    bodies_raw = params.get("bodies", [])
-    bodies = [_ensure_defaults(b.copy()) for b in bodies_raw]
-    joint_names = _collect_joint_bodies(bodies)
-
-    # body 链 XML（与 view_robot 相同）
-    body_xml = _build_chain_xml(bodies, idx=0, indent=2)
-
-    # actuator 区域
-    actuator_lines = []
-    for jn in joint_names:
-        actuator_lines.append(
-            f'    <position name="act_{jn}" joint="{jn}_joint"'
-            f' kp="100" kv="20" forcerange="-50 50"/>'
-        )
-    actuator_xml = "\n".join(actuator_lines)
-
-    xml = f"""<mujoco model="{robot_name}">
-  <compiler angle="radian" autolimits="true"/>
-  <option timestep="0.001" gravity="0 0 0"/>
-  <default>
-    <geom contype="0" conaffinity="0" condim="3"/>
-    <joint limited="true" range="-3.14 3.14"/>
-    <position kp="200"/>
-  </default>
-  <worldbody>
-    <light name="light1" pos="2 2 3" dir="-0.5 -0.5 -1" diffuse="0.8 0.8 0.8"/>
-    <light name="light2" pos="-1 -1 2" dir="0.5 0.5 -1" diffuse="0.4 0.4 0.4"/>
-    <geom name="floor" type="plane" pos="0 0 -1.2" size="3 3 0.1" rgba="0.85 0.85 0.85 1.0"/>
-{body_xml}
-  </worldbody>
-  <actuator>
-{actuator_xml}
-  </actuator>
-</mujoco>"""
-
-    return xml
-
-
-# ===========================================================================
 # 轨迹回放视窗
 # ===========================================================================
 
@@ -127,10 +72,10 @@ class TrajectoryViewer:
     """管理 MuJoCo 模型、轨迹回放和视窗。
 
     线程架构：
-      - 线程 A（动力学, ~1000 Hz）: mj_step() 推进仿真
-      - 线程 B（渲染,    ~60 Hz）: viewer.sync() 刷新画面
-      - 线程 C（轨迹控制, ~100 Hz）: 按 CSV 帧率更新 mj_data.ctrl
+      - 线程 A（渲染,    ~60 Hz）: viewer.sync() 刷新画面
+      - 线程 B（轨迹控制, ~CSV 帧率）: 直接设置 mj_data.qpos + mj_forward()
 
+    不通过 PD 控制器驱动，直接写入关节状态实现平滑播放。
     所有 mj_data 的访问由 threading.Lock() 保护。
     """
 
@@ -158,28 +103,11 @@ class TrajectoryViewer:
         self.viewer = mujoco.viewer.launch_passive(self.mj_model, self.mj_data)
         time.sleep(0.3)
 
-        # 首帧 ctrl 也设为轨迹第一帧，避免从 0 跳变
-        self.mj_data.ctrl[:] = q_traj[0]
-
         print("视窗已启动。按关闭按钮或 Ctrl+C 退出。")
 
     # ------------------------------------------------------------------
-    def _dynamics_thread(self) -> None:
-        """线程 A: 物理仿真步进。"""
-        while self._running and self.viewer.is_running():
-            step_start = time.perf_counter()
-
-            with self.lock:
-                mujoco.mj_step(self.mj_model, self.mj_data)
-
-            elapsed = time.perf_counter() - step_start
-            sleep_time = self.dt - elapsed
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-
-    # ------------------------------------------------------------------
     def _viewer_thread(self) -> None:
-        """线程 B: 视窗渲染刷新。"""
+        """线程 A: 视窗渲染刷新。"""
         while self._running and self.viewer.is_running():
             with self.lock:
                 self.viewer.sync()
@@ -187,10 +115,13 @@ class TrajectoryViewer:
 
     # ------------------------------------------------------------------
     def _trajectory_thread(self) -> None:
-        """线程 C: 按 CSV 帧率循环更新目标位置。
+        """线程 B: 按 CSV 帧率循环更新关节状态。
+
+        直接写入 mj_data.qpos 并调用 mj_forward() 更新运动学，
+        绕过 PD 控制器，实现无抖动的平滑播放。
 
         到达轨迹末尾时不直接跳回第 0 帧，而是通过线性插值平滑过渡
-        （过渡时长 = 1.0s），避免位置跳变导致的剧烈抖动。
+        （过渡时长 = 1.0s），避免位置跳变。
         """
         TRANSITION_TIME = 1.0       # 循环过渡时长 (s)
         n_transition = max(1, int(TRANSITION_TIME / self.dt_csv))
@@ -209,7 +140,8 @@ class TrajectoryViewer:
                 q_target = q_from + (q_to - q_from) * t
 
                 with self.lock:
-                    self.mj_data.ctrl[:] = q_target
+                    self.mj_data.qpos[:] = q_target
+                    mujoco.mj_forward(self.mj_model, self.mj_data)
 
                 self.traj_idx += 1
                 # 过渡完成，回到第 0 帧
@@ -220,7 +152,8 @@ class TrajectoryViewer:
                 q_target = self.q_traj[self.traj_idx]
 
                 with self.lock:
-                    self.mj_data.ctrl[:] = q_target
+                    self.mj_data.qpos[:] = q_target
+                    mujoco.mj_forward(self.mj_model, self.mj_data)
 
                 self.traj_idx += 1
 
@@ -233,7 +166,6 @@ class TrajectoryViewer:
     def run(self) -> None:
         """启动所有线程并阻塞直到用户关闭视窗。"""
         threads = [
-            threading.Thread(target=self._dynamics_thread, daemon=True, name="dynamics"),
             threading.Thread(target=self._viewer_thread, daemon=True, name="viewer"),
             threading.Thread(target=self._trajectory_thread, daemon=True, name="trajectory"),
         ]
@@ -274,9 +206,9 @@ def main():
     # 2. 加载轨迹
     q_traj, dt_csv = load_trajectory_csv(robot_name)
 
-    # 3. 构建 MJCF XML（带执行器）
-    print("构建 MuJoCo 模型（含 position 执行器）...")
-    xml_string = build_mjcf_xml_with_actuators(params, robot_name)
+    # 3. 构建 MJCF XML（无执行器，直接设置关节状态播放）
+    print("构建 MuJoCo 模型...")
+    xml_string = build_mjcf_xml(params, robot_name)
 
     # 4. 启动视窗 + 轨迹回放
     viewer = TrajectoryViewer(xml_string, q_traj, dt_csv)

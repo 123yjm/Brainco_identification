@@ -13,5 +13,5 @@
 
 algorithm: 1
 regularization: 1
-armature: true
+armature: false
 damping: true
