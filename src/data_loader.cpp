@@ -26,7 +26,7 @@ ExperimentData DataLoader::loadCSV(const std::string &filename,
   const std::size_t cols_with_raw    = 1 + 8 * n_dof;   // 57: filtered+raw combined
 
   std::vector<double> time_vec;
-  std::vector<std::vector<double>> q_vec, qd_vec, qdd_vec, tau_vec;
+  std::vector<std::vector<double>> q_vec, qd_vec, qdd_vec, tau_vec, tau_raw_vec;
   bool has_qdd = false;
   bool is_ref_format = false;   // 43-column raw format with q/dq/tau ref signals
   bool format_detected = false;
@@ -103,6 +103,15 @@ ExperimentData DataLoader::loadCSV(const std::string &filename,
         for (std::size_t i = 0; i < n_dof; ++i)
           tau_row.push_back(row[1 + 2 * n_dof + i]);
       }
+
+      // Read tau_raw if present (>= 57 columns: raw comparison data)
+      // tau_raw is at columns 1+7*n_dof .. 1+8*n_dof-1
+      if (row.size() >= cols_with_raw) {
+        std::vector<double> tau_raw_row;
+        for (std::size_t i = 0; i < n_dof; ++i)
+          tau_raw_row.push_back(row[1 + 7 * n_dof + i]);
+        tau_raw_vec.push_back(tau_raw_row);
+      }
     }
 
     q_vec.push_back(q_row);
@@ -143,6 +152,16 @@ ExperimentData DataLoader::loadCSV(const std::string &filename,
     std::cout << "Loaded " << data.n_samples << " samples from " << filename
               << " (qdd will be computed via numerical differentiation)"
               << std::endl;
+  }
+
+  // Load tau_raw if present
+  if (!tau_raw_vec.empty()) {
+    data.tau_raw.resize(data.n_samples, n_dof);
+    for (std::size_t i = 0; i < data.n_samples; ++i) {
+      for (std::size_t j = 0; j < n_dof; ++j) {
+        data.tau_raw(i, j) = tau_raw_vec[i][j];
+      }
+    }
   }
 
   return data;

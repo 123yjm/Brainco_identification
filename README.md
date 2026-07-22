@@ -1,5 +1,7 @@
 # Brainco Identification
 
+> **GitHub:** [https://github.com/123yjm/Brainco_identification](https://github.com/123yjm/Brainco_identification)
+
 串联机械臂（7-DOF）动力学参数辨识工具链，包含八个独立可执行模块：
 
 | 可执行文件 | 入口 | 功能 |

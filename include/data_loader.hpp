@@ -10,7 +10,8 @@ struct ExperimentData {
   Eigen::MatrixXd q;   // N x DOF
   Eigen::MatrixXd qd;  // N x DOF
   Eigen::MatrixXd qdd; // N x DOF (Computed during preprocessing)
-  Eigen::MatrixXd tau; // N x DOF
+  Eigen::MatrixXd tau;     // N x DOF (filtered)
+  Eigen::MatrixXd tau_raw; // N x DOF (raw, before filtering; may be empty)
   std::size_t n_samples;
   std::size_t n_dof;
 };

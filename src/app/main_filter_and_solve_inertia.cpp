@@ -54,6 +54,7 @@ ExperimentData filteredToExperiment(const signal_processing::FilteredOutputData&
     dst.qd        = src.q_dot_filtered;
     dst.qdd       = src.q_ddot_filtered;
     dst.tau       = src.tau_filtered;
+    dst.tau_raw   = src.tau_raw;
     dst.n_samples = static_cast<std::size_t>(src.n_samples);
     dst.n_dof     = static_cast<std::size_t>(src.n_dof);
     return dst;
@@ -142,6 +143,63 @@ void saveResults(const std::string& path, const std::string& algo_name,
     }
 
     out << "        ]\n";
+}
+
+void writeIdentificationCsv(const std::string& path,
+                            const ExperimentData& data,
+                            const robot_dynamics::IDynamicsRegressor& regressor,
+                            const Eigen::VectorXd& beta,
+                            robot_dynamics::ParamFlags flags) {
+    std::filesystem::path p(path);
+    if (p.has_parent_path()) std::filesystem::create_directories(p.parent_path());
+    std::ofstream out(path);
+    if (!out) { std::cerr << "无法写入: " << path << std::endl; return; }
+
+    const std::size_t dof = regressor.nDof();
+    const Eigen::Index K = static_cast<Eigen::Index>(data.n_samples);
+    const bool has_tau_raw = (data.tau_raw.size() > 0);
+
+    // Write header
+    out << "time";
+    for (std::size_t j = 0; j < dof; ++j) out << ",q" << j;
+    for (std::size_t j = 0; j < dof; ++j) out << ",qd" << j;
+    for (std::size_t j = 0; j < dof; ++j) out << ",qdd" << j;
+    for (std::size_t j = 0; j < dof; ++j) out << ",tau" << j;
+    for (std::size_t j = 0; j < dof; ++j) out << ",tau_raw" << j;
+    for (std::size_t j = 0; j < dof; ++j) out << ",tau_estimate" << j;
+    out << "\n";
+
+    out << std::fixed << std::setprecision(6);
+    for (Eigen::Index k = 0; k < K; ++k) {
+        out << data.time[k];
+
+        // q
+        for (std::size_t j = 0; j < dof; ++j) out << "," << data.q(k, j);
+        // qd
+        for (std::size_t j = 0; j < dof; ++j) out << "," << data.qd(k, j);
+        // qdd
+        for (std::size_t j = 0; j < dof; ++j) out << "," << data.qdd(k, j);
+        // tau (filtered)
+        for (std::size_t j = 0; j < dof; ++j) out << "," << data.tau(k, j);
+        // tau_raw
+        for (std::size_t j = 0; j < dof; ++j) {
+            out << ",";
+            if (has_tau_raw) out << data.tau_raw(k, j);
+            else out << "0.0";
+        }
+
+        // tau_estimate = Y(q,qd,qdd) * beta
+        Eigen::VectorXd q   = data.q.row(k).transpose();
+        Eigen::VectorXd qd  = data.qd.row(k).transpose();
+        Eigen::VectorXd qdd = data.qdd.row(k).transpose();
+        Eigen::MatrixXd Y_k = regressor.computeRegressorMatrix(q, qd, qdd, flags);
+        Eigen::VectorXd tau_est = Y_k * beta;
+        for (std::size_t j = 0; j < dof; ++j) out << "," << tau_est(j);
+
+        out << "\n";
+    }
+
+    std::cout << "辨识结果 CSV 已保存: " << path << " (" << K << " 行)" << std::endl;
 }
 
 void printHelp(const char* prog) {
@@ -233,6 +291,7 @@ int main(int argc, char* argv[]) {
         filtered.tau_filtered    = raw.motor_current;
     }
     filtered.q_ddot_filtered = signal_processing::centralDifference(filtered.q_dot_filtered, 1.0/fs);
+    filtered.tau_raw = raw.motor_current;  // preserve raw torque for comparison CSV
     std::cout << "滤波完成, 样本: " << filtered.n_samples << std::endl;
 
     // ---- 2. 辨识 ----------------------------------------------------------
@@ -289,6 +348,11 @@ int main(int argc, char* argv[]) {
         saveResults(output_yaml, algo, r.beta, r.rmse, r.max_err, robot_name, append,
                     regressor->nBodies(), regressor->nDof());
         append = true;
+
+        // Write per-sample identification result CSV
+        std::string csv_path = robot_utils::resultInertiaPath(
+            robot_dir, robot_name + "_identification_result_" + algo + ".csv");
+        writeIdentificationCsv(csv_path, data, *regressor, r.beta, flags);
     }
 
     std::cout << "\n结果: " << output_yaml << std::endl;
